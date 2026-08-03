@@ -87,7 +87,17 @@
 
   /* ── Dashboard ── */
   #dashboard { display: none; padding: 28px; max-width: 1100px; margin: 0 auto; }
-  .stat-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 32px; }
+
+  .range-row { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+  .range-label { font-size: 12px; color: var(--text-3); font-weight: 600; margin-right: 4px; }
+  .range-btn {
+    font-size: 13px; font-weight: 600; color: var(--text-2); background: var(--surface);
+    border: 1.5px solid var(--border); border-radius: 999px; padding: 7px 16px; cursor: pointer;
+    font-family: 'Manrope', sans-serif;
+  }
+  .range-btn.active { background: var(--sage-tint); border-color: var(--sage); color: var(--sage-deep); }
+
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 32px; }
   .stat-tile {
     background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
     padding: 18px; display: flex; flex-direction: column; gap: 6px;
@@ -96,6 +106,23 @@
   .stat-value { font-family: 'Fraunces', serif; font-weight: 700; font-size: 30px; color: var(--text); }
 
   .section-title { font-size: 15px; font-weight: 700; color: var(--text-2); margin-bottom: 12px; letter-spacing: 0.02em; }
+
+  /* ── Usage chart (validated categorical slots — see dataviz skill) ── */
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px; margin-bottom: 32px; position: relative;
+  }
+  .chart-legend { display: flex; gap: 18px; margin-bottom: 14px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .chart-svg-wrap { position: relative; }
+  .chart-tooltip {
+    position: absolute; pointer-events: none; background: var(--ink); color: var(--sand);
+    border-radius: 8px; padding: 8px 12px; font-size: 12px; line-height: 1.5; white-space: nowrap;
+    transform: translate(-50%, -110%); opacity: 0; transition: opacity 0.1s; z-index: 5;
+  }
+  .chart-tooltip .tt-row { display: flex; align-items: center; gap: 6px; }
+  .chart-tooltip .tt-dot { width: 7px; height: 7px; border-radius: 2px; }
   .table-wrap {
     background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
     overflow-x: auto; overflow-y: hidden;
@@ -145,7 +172,22 @@
 </div>
 
 <div id="dashboard">
+  <div class="range-row" id="range-row">
+    <span class="range-label">Range:</span>
+    <button class="range-btn" data-days="7" onclick="setRange(7)">7 days</button>
+    <button class="range-btn active" data-days="30" onclick="setRange(30)">30 days</button>
+    <button class="range-btn" data-days="90" onclick="setRange(90)">90 days</button>
+    <button class="range-btn" data-days="all" onclick="setRange('all')">All time</button>
+  </div>
+
   <div class="stat-row" id="stat-row"></div>
+
+  <div class="section-title">Usage over time</div>
+  <div class="chart-card">
+    <div class="chart-legend" id="chart-legend"></div>
+    <div class="chart-svg-wrap" id="chart-svg-wrap"></div>
+  </div>
+
   <div class="section-title">Users</div>
   <div class="table-wrap" id="table-wrap"></div>
 </div>
@@ -157,8 +199,50 @@
   var usersData = [];
   var sortKey = 'registered_at';
   var sortAsc = false;
+  var rangeDays = 30;
+  // App's earliest real data predates this by a comfortable margin — used
+  // as the "All time" lower bound so admin_get_timeseries has a concrete
+  // start date to generate buckets from.
+  var ALL_TIME_START = '2026-01-01T00:00:00.000Z';
+
+  // Validated categorical slots (dataviz skill default theme, first 3 —
+  // these clear every adjacent + all-pairs CVD/contrast gate in both modes).
+  var SERIES = [
+    { key: 'signups', label: 'Signups', light: '#2a78d6', dark: '#3987e5' },
+    { key: 'stylist_uses', label: 'Stylist Uses', light: '#eb6834', dark: '#d95926' },
+    { key: 'find_in_closet_uses', label: 'Find in Closet Uses', light: '#1baf7a', dark: '#199e70' },
+  ];
 
   if (accessToken) { loadDashboard(); }
+
+  function isDarkMode() {
+    var stamped = document.documentElement.getAttribute('data-theme');
+    if (stamped === 'dark') return true;
+    if (stamped === 'light') return false;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  function seriesColor(s) { return isDarkMode() ? s.dark : s.light; }
+
+  function dateBounds() {
+    var to = new Date();
+    var from;
+    if (rangeDays === 'all') {
+      from = new Date(ALL_TIME_START);
+    } else {
+      from = new Date(to.getTime() - rangeDays * 86400000);
+    }
+    return { from: from.toISOString(), to: to.toISOString() };
+  }
+
+  function setRange(days) {
+    rangeDays = days;
+    var buttons = document.querySelectorAll('.range-btn');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].classList.toggle('active', buttons[i].getAttribute('data-days') === String(days));
+    }
+    refreshRangedData();
+  }
 
   function login(event) {
     event.preventDefault();
@@ -197,7 +281,7 @@
     document.getElementById('login-screen').style.display = 'flex';
   }
 
-  function rpc(name) {
+  function rpc(name, params) {
     return fetch(SUPABASE_URL + '/rest/v1/rpc/' + name, {
       method: 'POST',
       headers: {
@@ -205,7 +289,7 @@
         'Authorization': 'Bearer ' + accessToken,
         'Content-Type': 'application/json',
       },
-      body: '{}',
+      body: JSON.stringify(params || {}),
     }).then(function (res) {
       if (!res.ok) return res.json().then(function (b) { throw new Error(b.message || 'Request failed'); });
       return res.json();
@@ -214,14 +298,14 @@
 
   function loadDashboard() {
     var err = document.getElementById('login-error');
-    return Promise.all([rpc('admin_get_overview'), rpc('admin_get_users')])
-      .then(function (results) {
-        renderStats(results[0][0]);
-        usersData = results[1];
+    return rpc('admin_get_users')
+      .then(function (users) {
+        usersData = users;
         renderTable();
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('dashboard').style.display = 'block';
         document.getElementById('logout-btn').style.display = 'inline-block';
+        return refreshRangedData();
       })
       .catch(function (e) {
         if (e.message === 'Not authorized') {
@@ -236,13 +320,26 @@
       });
   }
 
+  function refreshRangedData() {
+    var bounds = dateBounds();
+    return Promise.all([
+      rpc('admin_get_overview', { from_date: bounds.from, to_date: bounds.to }),
+      rpc('admin_get_timeseries', { from_date: bounds.from, to_date: bounds.to }),
+    ]).then(function (results) {
+      renderStats(results[0][0]);
+      renderChart(results[1]);
+    });
+  }
+
   function renderStats(o) {
     var tiles = [
       ['Total Users', o.total_users],
-      ['New This Week', o.signups_last_7_days],
-      ['Items Cataloged', o.total_items_cataloged],
       ['Active Listings', o.total_active_listings],
-      ['Total Sales', o.total_sales],
+      ['New Signups', o.signups_in_range],
+      ['Items Cataloged', o.items_cataloged_in_range],
+      ['Sales', o.sales_in_range],
+      ['Stylist Uses', o.stylist_uses_in_range],
+      ['Find in Closet Uses', o.find_in_closet_uses_in_range],
     ];
     document.getElementById('stat-row').innerHTML = tiles.map(function (t) {
       return '<div class="stat-tile"><span class="stat-label">' + t[0] + '</span><span class="stat-value num">' + t[1] + '</span></div>';
@@ -280,6 +377,10 @@
       ['listings_created', 'Listings'],
       ['items_sold', 'Sold'],
       ['items_bought', 'Bought'],
+      ['stylist_uses', 'Stylist'],
+      ['find_in_closet_uses', 'Find in Closet'],
+      ['linked_closets_count', 'Linked Closets'],
+      ['weather_enabled', 'Weather'],
     ];
     var sorted = usersData.slice().sort(function (a, b) {
       var av = a[sortKey], bv = b[sortKey];
@@ -302,8 +403,116 @@
         '<td class="num">' + u.listings_created + '</td>' +
         '<td class="num">' + u.items_sold + '</td>' +
         '<td class="num">' + u.items_bought + '</td>' +
+        '<td class="num">' + u.stylist_uses + '</td>' +
+        '<td class="num">' + u.find_in_closet_uses + '</td>' +
+        '<td class="num">' + u.linked_closets_count + '</td>' +
+        '<td class="' + (u.weather_enabled ? '' : 'muted') + '">' + (u.weather_enabled ? 'Yes' : '—') + '</td>' +
         '</tr>';
     }).join('') + '</tbody>';
     wrap.innerHTML = '<table>' + thead + tbody + '</table>';
+  }
+
+  function renderChart(rows) {
+    var legend = document.getElementById('chart-legend');
+    legend.innerHTML = SERIES.map(function (s) {
+      return '<div class="legend-item"><span class="legend-swatch" style="background:' + seriesColor(s) + '"></span>' + s.label + '</div>';
+    }).join('');
+
+    var wrap = document.getElementById('chart-svg-wrap');
+    var width = Math.max(wrap.clientWidth || 640, 280);
+    var height = 220;
+    var padL = 34, padR = 12, padT = 12, padB = 26;
+    var plotW = width - padL - padR;
+    var plotH = height - padT - padB;
+
+    if (!rows || rows.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">No data in this range.</div>';
+      return;
+    }
+
+    var maxVal = 1;
+    rows.forEach(function (r) {
+      SERIES.forEach(function (s) { if (r[s.key] > maxVal) maxVal = r[s.key]; });
+    });
+    // Round the axis ceiling up to a tidy step so gridlines land on whole numbers.
+    var step = Math.pow(10, Math.floor(Math.log(maxVal) / Math.LN10));
+    if (maxVal / step <= 2) step = step / 2;
+    var axisMax = Math.ceil(maxVal / step) * step;
+    if (axisMax < 4) axisMax = 4;
+
+    function xAt(i) { return padL + (rows.length === 1 ? plotW / 2 : (i / (rows.length - 1)) * plotW); }
+    function yAt(v) { return padT + plotH - (v / axisMax) * plotH; }
+
+    var gridlines = '';
+    var ticks = 4;
+    for (var g = 0; g <= ticks; g++) {
+      var gv = (axisMax / ticks) * g;
+      var gy = yAt(gv);
+      gridlines += '<line x1="' + padL + '" y1="' + gy + '" x2="' + (width - padR) + '" y2="' + gy + '" stroke="var(--border)" stroke-width="1" />';
+      gridlines += '<text x="' + (padL - 8) + '" y="' + (gy + 4) + '" font-size="10" fill="var(--text-3)" text-anchor="end" font-family="Manrope, sans-serif">' + Math.round(gv) + '</text>';
+    }
+
+    var xLabels = '';
+    var labelEvery = Math.ceil(rows.length / 6);
+    rows.forEach(function (r, i) {
+      if (i % labelEvery !== 0 && i !== rows.length - 1) return;
+      var d = new Date(r.day + 'T00:00:00Z');
+      var label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      xLabels += '<text x="' + xAt(i) + '" y="' + (height - 6) + '" font-size="10" fill="var(--text-3)" text-anchor="middle" font-family="Manrope, sans-serif">' + label + '</text>';
+    });
+
+    var lines = SERIES.map(function (s) {
+      var d = rows.map(function (r, i) { return (i === 0 ? 'M' : 'L') + xAt(i) + ',' + yAt(r[s.key]); }).join(' ');
+      return '<path d="' + d + '" fill="none" stroke="' + seriesColor(s) + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />';
+    }).join('');
+
+    var svg = '<svg id="chart-svg" width="100%" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" style="display:block;">' +
+      gridlines + xLabels + lines +
+      '<line id="chart-crosshair" x1="0" y1="' + padT + '" x2="0" y2="' + (padT + plotH) + '" stroke="var(--text-3)" stroke-width="1" opacity="0" />' +
+      '<rect x="' + padL + '" y="' + padT + '" width="' + plotW + '" height="' + plotH + '" fill="transparent" style="cursor:crosshair;" onmousemove="chartHover(event)" onmouseleave="chartHoverEnd()" />' +
+      '</svg>' +
+      '<div class="chart-tooltip" id="chart-tooltip"></div>';
+    wrap.innerHTML = svg;
+
+    wrap._rows = rows;
+    wrap._xAt = xAt;
+    wrap._padL = padL;
+    wrap._plotW = plotW;
+  }
+
+  function chartHover(evt) {
+    var wrap = document.getElementById('chart-svg-wrap');
+    var rows = wrap._rows;
+    if (!rows || rows.length === 0) return;
+    var svg = document.getElementById('chart-svg');
+    var rect = svg.getBoundingClientRect();
+    var scale = svg.viewBox.baseVal.width / rect.width;
+    var mouseX = (evt.clientX - rect.left) * scale;
+    var relative = (mouseX - wrap._padL) / wrap._plotW;
+    var idx = Math.round(relative * (rows.length - 1));
+    idx = Math.max(0, Math.min(rows.length - 1, idx));
+
+    var cx = wrap._xAt(idx);
+    var crosshair = document.getElementById('chart-crosshair');
+    crosshair.setAttribute('x1', cx); crosshair.setAttribute('x2', cx); crosshair.setAttribute('opacity', '1');
+
+    var row = rows[idx];
+    var d = new Date(row.day + 'T00:00:00Z');
+    var dateLabel = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    var tt = document.getElementById('chart-tooltip');
+    tt.innerHTML = '<strong>' + dateLabel + '</strong>' + SERIES.map(function (s) {
+      return '<div class="tt-row"><span class="tt-dot" style="background:' + seriesColor(s) + '"></span>' + s.label + ': ' + row[s.key] + '</div>';
+    }).join('');
+    var rectBounds = svg.getBoundingClientRect();
+    tt.style.left = ((cx / svg.viewBox.baseVal.width) * rectBounds.width) + 'px';
+    tt.style.top = '0px';
+    tt.style.opacity = '1';
+  }
+
+  function chartHoverEnd() {
+    var crosshair = document.getElementById('chart-crosshair');
+    if (crosshair) crosshair.setAttribute('opacity', '0');
+    var tt = document.getElementById('chart-tooltip');
+    if (tt) tt.style.opacity = '0';
   }
 </script>
