@@ -264,8 +264,29 @@
   /* Final CTA */
   .cta { text-align: center; }
   .cta h2 { font-size: clamp(28px, 4vw, 42px); margin-bottom: 16px; }
-  .cta p { color: var(--text-2); font-size: 16px; max-width: 480px; margin: 0 auto 32px; }
-  .cta .hero-ctas { justify-content: center; margin-bottom: 20px; }
+  .cta p { color: var(--text-2); font-size: 16px; max-width: 480px; margin: 0 auto 24px; }
+  .cta .hero-ctas { justify-content: center; margin-top: 28px; margin-bottom: 20px; }
+
+  .waitlist-form {
+    display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+    max-width: 440px; margin: 0 auto;
+  }
+  .waitlist-input {
+    flex: 1; min-width: 220px; height: 52px; border-radius: 999px;
+    border: 1.5px solid var(--border); background: var(--surface);
+    padding: 0 20px; font-size: 15px; color: var(--text); font-family: 'Manrope', sans-serif;
+  }
+  .waitlist-input::placeholder { color: var(--text-3); }
+  .waitlist-input:focus { outline: 2px solid var(--sage); outline-offset: 2px; }
+  .waitlist-submit {
+    height: 52px; padding: 0 28px; border-radius: 999px; border: none;
+    background: var(--sage); color: var(--surface); font-weight: 700; font-size: 15px;
+    font-family: 'Manrope', sans-serif; cursor: pointer;
+  }
+  .waitlist-submit:disabled { opacity: 0.6; cursor: default; }
+  .waitlist-message { min-height: 20px; margin-top: 14px; font-size: 14px; font-weight: 600; }
+  .waitlist-message.success { color: var(--sage-deep); }
+  .waitlist-message.error { color: #B5533C; }
 
   /* Footer */
   footer { background: var(--ink); color: color-mix(in srgb, var(--sand) 75%, transparent); padding: 48px 24px 32px; position: relative; }
@@ -319,7 +340,7 @@
         <span class="lines"><span class="top">Coming to</span><span class="bottom">Google Play</span></span>
       </div>
     </div>
-    <p class="hero-note">Testing today? <a href="#download">Ask about early access →</a></p>
+    <p class="hero-note">Want early access? <a href="#download">Leave your email →</a></p>
   </div>
   <div class="hero-visual">
     <div class="rail"></div>
@@ -469,7 +490,14 @@
   <div class="wrap">
     <span class="eyebrow">Launching soon</span>
     <h2>Be first to try QuickCloset.</h2>
-    <p>App Store and Google Play links land here once we launch. In the meantime, we're testing with a small group — reach out if you'd like early access.</p>
+    <p>Leave your email and we'll let you know the moment QuickCloset launches — one message, no spam.</p>
+
+    <form class="waitlist-form" id="waitlist-form" onsubmit="return submitWaitlist(event)">
+      <input type="email" id="waitlist-email" class="waitlist-input" placeholder="you@email.com" required autocomplete="email" />
+      <button type="submit" id="waitlist-submit" class="waitlist-submit">Notify Me</button>
+    </form>
+    <p id="waitlist-message" class="waitlist-message" role="status"></p>
+
     <div class="hero-ctas">
       <div class="store-badge">
         <span class="tag">Soon</span>
@@ -496,3 +524,52 @@
     <div class="foot-note">&copy; 2026 QuickCloset. Built in South Africa.</div>
   </div>
 </footer>
+
+<script>
+  var SUPABASE_URL = 'https://wyrvlotqsqztmatpwvih.supabase.co';
+  var SUPABASE_ANON_KEY = 'sb_publishable_y0QJd5N8GlKUX_EszjwFfA_ilIDpdl-';
+
+  function submitWaitlist(event) {
+    event.preventDefault();
+    var input = document.getElementById('waitlist-email');
+    var btn = document.getElementById('waitlist-submit');
+    var msg = document.getElementById('waitlist-message');
+    var email = input.value.trim();
+
+    msg.className = 'waitlist-message';
+    if (!email || email.indexOf('@') === -1) {
+      msg.textContent = 'Please enter a valid email address.';
+      msg.className = 'waitlist-message error';
+      return false;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Joining…';
+
+    fetch(SUPABASE_URL + '/rest/v1/waitlist_signups', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({ email: email }),
+    }).then(function (res) {
+      if (res.ok || res.status === 409) {
+        document.getElementById('waitlist-form').style.display = 'none';
+        msg.textContent = "You're on the list — we'll email you the moment QuickCloset launches.";
+        msg.className = 'waitlist-message success';
+      } else {
+        throw new Error('request failed: ' + res.status);
+      }
+    }).catch(function () {
+      msg.textContent = 'Something went wrong — please try again in a moment.';
+      msg.className = 'waitlist-message error';
+      btn.disabled = false;
+      btn.textContent = 'Notify Me';
+    });
+
+    return false;
+  }
+</script>
