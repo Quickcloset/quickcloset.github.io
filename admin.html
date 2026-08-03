@@ -105,7 +105,15 @@
   .stat-label { font-size: 11px; font-weight: 700; color: var(--text-3); letter-spacing: 0.06em; text-transform: uppercase; }
   .stat-value { font-family: 'Fraunces', serif; font-weight: 700; font-size: 30px; color: var(--text); }
 
-  .section-title { font-size: 15px; font-weight: 700; color: var(--text-2); margin-bottom: 12px; letter-spacing: 0.02em; }
+  .section-title {
+    font-size: 15px; font-weight: 700; color: var(--text-2); margin-bottom: 12px; letter-spacing: 0.02em;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .csv-btn {
+    font-size: 12px; font-weight: 700; color: var(--sage-deep); background: var(--sage-tint);
+    border: 1.5px solid var(--sage); border-radius: 999px; padding: 6px 14px; cursor: pointer;
+    font-family: 'Manrope', sans-serif; white-space: nowrap;
+  }
 
   /* ── Usage chart (validated categorical slots — see dataviz skill) ── */
   .chart-card {
@@ -157,6 +165,23 @@
   @media (max-width: 760px) {
     .stat-row { grid-template-columns: repeat(2, 1fr); }
   }
+
+  /* Printed/PDF output: always light and paper-safe, regardless of the
+     viewer's dark mode — and hide anything that's only useful on-screen. */
+  @media print {
+    :root {
+      --sage: #7C9468; --sage-deep: #5B7248; --sage-tint: #E4EBDC; --sand: #FFFFFF;
+      --surface: #FFFFFF; --surface-alt: #F1EEE7; --text: #1A1410; --text-2: #4A4038;
+      --text-3: #83786C; --border: #D8D0C2; --ink: #1A1410; --error: #A8452F; --shadow: transparent;
+    }
+    body { background: #fff; }
+    header, .range-row, .csv-btn, .logout-btn, #chart-tooltip { display: none !important; }
+    .stat-tile, .table-wrap, .chart-card, .total-income-banner, .login-card { box-shadow: none !important; }
+    .table-wrap { overflow: visible; }
+    table { min-width: 0; }
+    #dashboard { padding: 0; max-width: 100%; }
+    .stat-row, .chart-card, .table-wrap, .total-income-banner { break-inside: avoid; }
+  }
 </style>
 
 <header>
@@ -191,6 +216,7 @@
     <button class="range-btn active" data-days="30" onclick="setRange(30)">30 days</button>
     <button class="range-btn" data-days="90" onclick="setRange(90)">90 days</button>
     <button class="range-btn" data-days="all" onclick="setRange('all')">All time</button>
+    <button class="range-btn print-btn" style="margin-left:auto;" onclick="window.print()">Print / Save as PDF</button>
   </div>
 
   <div class="stat-row" id="stat-row"></div>
@@ -201,10 +227,16 @@
     <div class="chart-svg-wrap" id="chart-svg-wrap"></div>
   </div>
 
-  <div class="section-title">Users</div>
+  <div class="section-title">
+    <span>Users</span>
+    <button class="csv-btn" onclick="exportUsersCSV()">Export CSV</button>
+  </div>
   <div class="table-wrap" id="table-wrap"></div>
 
-  <div class="section-title" style="margin-top:32px;">Income Report <span style="font-weight:500;color:var(--text-3);">— for SARS / your accountant</span></div>
+  <div class="section-title" style="margin-top:32px;">
+    <span>Income Report <span style="font-weight:500;color:var(--text-3);">— for SARS / your accountant</span></span>
+    <button class="csv-btn" onclick="exportIncomeCSV()">Export CSV</button>
+  </div>
   <p class="income-note">
     Transaction fee income is real, from <code>orders.platform_fee</code> — it reads R0 because the fee has been
     set to 0% this whole time, not because tracking is broken. Subscription income isn't shown: no recurring
@@ -219,6 +251,7 @@
   var SUPABASE_ANON_KEY = 'sb_publishable_y0QJd5N8GlKUX_EszjwFfA_ilIDpdl-';
   var accessToken = sessionStorage.getItem('qc_admin_token');
   var usersData = [];
+  var incomeRows = [];
   var sortKey = 'registered_at';
   var sortAsc = false;
   var rangeDays = 30;
@@ -386,6 +419,51 @@
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
+  // Plain CSV, opens straight into Excel/Numbers/Sheets — no library needed.
+  function downloadCSV(filename, columns, rows) {
+    var csvRows = [columns.map(function (c) { return c[1]; })];
+    rows.forEach(function (r) {
+      csvRows.push(columns.map(function (c) {
+        var v = typeof c[2] === 'function' ? c[2](r) : r[c[0]];
+        return v == null ? '' : String(v);
+      }));
+    });
+    var csv = csvRows.map(function (row) {
+      return row.map(function (cell) { return '"' + String(cell).replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\r\n');
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function exportUsersCSV() {
+    downloadCSV('quickcloset-users.csv', [
+      ['username', 'Username'],
+      ['registered_at', 'Registered', function (r) { return fmtDate(r.registered_at); }],
+      ['last_active_at', 'Last Active', function (r) { return fmtDate(r.last_active_at); }],
+      ['items_cataloged', 'Cataloged'],
+      ['listings_created', 'Listings'],
+      ['items_sold', 'Sold'],
+      ['items_bought', 'Bought'],
+      ['stylist_uses', 'Stylist Uses'],
+      ['find_in_closet_uses', 'Find in Closet Uses'],
+      ['linked_closets_count', 'Linked Closets'],
+      ['weather_enabled', 'Weather Enabled', function (r) { return r.weather_enabled ? 'Yes' : 'No'; }],
+    ], usersData);
+  }
+
+  function exportIncomeCSV() {
+    downloadCSV('quickcloset-income-report.csv', [
+      ['month', 'Month', function (r) { return new Date(r.month + 'T00:00:00Z').toLocaleDateString(undefined, { year: 'numeric', month: 'long' }); }],
+      ['orders_count', 'Orders'],
+      ['gross_sales', 'Gross Sales (ZAR)'],
+      ['transaction_fee_income', 'Transaction Fee Income (ZAR)'],
+    ], incomeRows);
+  }
+
   function sortBy(key) {
     if (sortKey === key) { sortAsc = !sortAsc; } else { sortKey = key; sortAsc = false; }
     renderTable();
@@ -454,6 +532,7 @@
   }
 
   function renderIncomeTable(rows) {
+    incomeRows = rows || [];
     var wrap = document.getElementById('income-table-wrap');
     if (!rows || rows.length === 0) {
       wrap.innerHTML = '<div class="empty-state">No paid orders in this range.</div>';
