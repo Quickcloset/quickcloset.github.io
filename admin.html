@@ -93,6 +93,13 @@
   }
   .login-btn:disabled { opacity: 0.6; cursor: default; }
   .login-error { color: var(--error); font-size: 13px; margin-top: 14px; min-height: 16px; }
+  .login-success { color: var(--sage-deep); font-size: 13px; margin-top: 8px; min-height: 16px; }
+  .link-btn {
+    display: block; margin: 14px auto 0; background: none; border: none; padding: 0;
+    color: var(--text-2); font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Manrope', sans-serif;
+    text-decoration: underline; text-decoration-color: transparent; transition: text-decoration-color 0.12s;
+  }
+  .link-btn:hover { color: var(--sage-deep); text-decoration-color: var(--sage-deep); }
 
   /* ── Dashboard ── */
   #dashboard { display: none; padding: 28px; max-width: 1100px; margin: 0 auto; }
@@ -295,17 +302,46 @@
 
 <div id="login-screen">
   <div class="login-card">
-    <h1>Admin Login</h1>
-    <span class="sub">Sign in with your QuickCloset account.</span>
-    <form onsubmit="return login(event)">
-      <label class="field-label" for="email">Email</label>
-      <input class="field-input" id="email" type="email" required autocomplete="email" />
-      <label class="field-label" for="password">Password</label>
-      <input class="field-input" id="password" type="password" required autocomplete="current-password" />
-      <label class="remember-row"><input type="checkbox" id="remember-me" checked /> Remember me on this device</label>
-      <button class="login-btn" id="login-btn" type="submit">Log In</button>
-    </form>
-    <p class="login-error" id="login-error"></p>
+    <div id="login-panel">
+      <h1>Admin Login</h1>
+      <span class="sub">Sign in with your QuickCloset account.</span>
+      <form onsubmit="return login(event)">
+        <label class="field-label" for="email">Email</label>
+        <input class="field-input" id="email" type="email" required autocomplete="email" />
+        <label class="field-label" for="password">Password</label>
+        <input class="field-input" id="password" type="password" required autocomplete="current-password" />
+        <label class="remember-row"><input type="checkbox" id="remember-me" checked /> Remember me on this device</label>
+        <button class="login-btn" id="login-btn" type="submit">Log In</button>
+      </form>
+      <button class="link-btn" onclick="showForgotPanel()">Forgot password?</button>
+      <p class="login-error" id="login-error"></p>
+    </div>
+
+    <div id="forgot-panel" style="display:none;">
+      <h1>Reset Password</h1>
+      <span class="sub">Enter your email and we'll send you a reset link.</span>
+      <form onsubmit="return sendResetLink(event)">
+        <label class="field-label" for="forgot-email">Email</label>
+        <input class="field-input" id="forgot-email" type="email" required autocomplete="email" />
+        <button class="login-btn" id="forgot-btn" type="submit">Send Reset Link</button>
+      </form>
+      <button class="link-btn" onclick="showLoginPanel()">Back to log in</button>
+      <p class="login-error" id="forgot-error"></p>
+      <p class="login-success" id="forgot-success"></p>
+    </div>
+
+    <div id="recovery-panel" style="display:none;">
+      <h1>Set New Password</h1>
+      <span class="sub">Choose a new password for your admin account.</span>
+      <form onsubmit="return setNewPassword(event)">
+        <label class="field-label" for="new-password">New Password</label>
+        <input class="field-input" id="new-password" type="password" required autocomplete="new-password" minlength="6" />
+        <label class="field-label" for="confirm-password">Confirm Password</label>
+        <input class="field-input" id="confirm-password" type="password" required autocomplete="new-password" minlength="6" />
+        <button class="login-btn" id="recovery-btn" type="submit">Set Password &amp; Log In</button>
+      </form>
+      <p class="login-error" id="recovery-error"></p>
+    </div>
   </div>
 </div>
 
@@ -457,7 +493,13 @@
     { key: 'find_in_closet_uses', label: 'Find in Closet Uses', light: '#1baf7a', dark: '#199e70' },
   ];
 
+  var RECOVERY_TOKENS = parseRecoveryHash();
+
   (function () {
+    if (RECOVERY_TOKENS) {
+      showPanel('recovery-panel');
+      return;
+    }
     var stored = loadStoredSession();
     if (!stored) return;
     accessToken = stored.access_token;
@@ -465,6 +507,100 @@
     tokenExpiresAt = stored.expires_at;
     ensureFreshToken().then(loadDashboard).catch(function () { clearSession(); });
   })();
+
+  // Supabase's password-recovery email links back here with the session in
+  // the URL hash (#access_token=...&type=recovery&...) rather than a query
+  // string — this reads that out once, then clears it so a refresh doesn't
+  // re-trigger recovery mode with an already-used token.
+  function parseRecoveryHash() {
+    var hash = window.location.hash || '';
+    if (hash.indexOf('type=recovery') === -1) return null;
+    var params = new URLSearchParams(hash.slice(1));
+    var accessTok = params.get('access_token');
+    var refreshTok = params.get('refresh_token');
+    if (!accessTok) return null;
+    history.replaceState(null, '', window.location.pathname);
+    return { access_token: accessTok, refresh_token: refreshTok, expires_in: Number(params.get('expires_in')) || 3600 };
+  }
+
+  function showPanel(id) {
+    ['login-panel', 'forgot-panel', 'recovery-panel'].forEach(function (p) {
+      document.getElementById(p).style.display = p === id ? 'block' : 'none';
+    });
+  }
+
+  function showForgotPanel() {
+    document.getElementById('forgot-email').value = document.getElementById('email').value;
+    document.getElementById('forgot-error').textContent = '';
+    document.getElementById('forgot-success').textContent = '';
+    showPanel('forgot-panel');
+  }
+
+  function showLoginPanel() {
+    showPanel('login-panel');
+  }
+
+  function sendResetLink(event) {
+    event.preventDefault();
+    var email = document.getElementById('forgot-email').value.trim();
+    var btn = document.getElementById('forgot-btn');
+    var err = document.getElementById('forgot-error');
+    var success = document.getElementById('forgot-success');
+    err.textContent = '';
+    success.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+
+    var redirectTo = window.location.origin + window.location.pathname;
+    fetch(SUPABASE_URL + '/auth/v1/recover?redirect_to=' + encodeURIComponent(redirectTo), {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email }),
+    }).then(function (res) {
+      if (!res.ok) return res.json().then(function (b) { throw new Error(b.msg || b.error_description || 'Could not send reset link'); });
+      success.textContent = 'Check your email for a reset link.';
+      btn.textContent = 'Send Reset Link';
+      btn.disabled = false;
+    }).catch(function (e) {
+      err.textContent = e.message;
+      btn.disabled = false;
+      btn.textContent = 'Send Reset Link';
+    });
+    return false;
+  }
+
+  function setNewPassword(event) {
+    event.preventDefault();
+    var pw = document.getElementById('new-password').value;
+    var confirm = document.getElementById('confirm-password').value;
+    var btn = document.getElementById('recovery-btn');
+    var err = document.getElementById('recovery-error');
+    err.textContent = '';
+
+    if (pw !== confirm) { err.textContent = "Passwords don't match."; return false; }
+    if (pw.length < 6) { err.textContent = 'Password must be at least 6 characters.'; return false; }
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    fetch(SUPABASE_URL + '/auth/v1/user', {
+      method: 'PUT',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + RECOVERY_TOKENS.access_token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ password: pw }),
+    }).then(function (res) {
+      if (!res.ok) return res.json().then(function (b) { throw new Error(b.msg || b.error_description || 'Could not set new password'); });
+      saveSession(RECOVERY_TOKENS, true);
+      return loadDashboard();
+    }).catch(function (e) {
+      err.textContent = e.message;
+      btn.disabled = false;
+      btn.textContent = 'Set Password & Log In';
+    });
+    return false;
+  }
 
   function loadStoredSession() {
     var raw = localStorage.getItem('qc_admin_session') || sessionStorage.getItem('qc_admin_session');
@@ -575,6 +711,7 @@
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('logout-btn').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
+    showPanel('login-panel');
   }
 
   function rpc(name, params) {
