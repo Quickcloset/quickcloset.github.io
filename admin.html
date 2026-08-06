@@ -82,6 +82,11 @@
     font-family: 'Manrope', sans-serif; margin-bottom: 16px;
   }
   .field-input:focus { outline: 2px solid var(--sage); outline-offset: 1px; }
+  .remember-row {
+    display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2);
+    margin-bottom: 18px; cursor: pointer; user-select: none;
+  }
+  .remember-row input { width: 15px; height: 15px; accent-color: var(--sage); cursor: pointer; }
   .login-btn {
     width: 100%; height: 48px; border-radius: 10px; border: none; background: var(--sage);
     color: var(--surface); font-weight: 700; font-size: 15px; cursor: pointer; font-family: 'Manrope', sans-serif;
@@ -297,6 +302,7 @@
       <input class="field-input" id="email" type="email" required autocomplete="email" />
       <label class="field-label" for="password">Password</label>
       <input class="field-input" id="password" type="password" required autocomplete="current-password" />
+      <label class="remember-row"><input type="checkbox" id="remember-me" checked /> Remember me on this device</label>
       <button class="login-btn" id="login-btn" type="submit">Log In</button>
     </form>
     <p class="login-error" id="login-error"></p>
@@ -421,7 +427,12 @@
 <script>
   var SUPABASE_URL = 'https://wyrvlotqsqztmatpwvih.supabase.co';
   var SUPABASE_ANON_KEY = 'sb_publishable_y0QJd5N8GlKUX_EszjwFfA_ilIDpdl-';
-  var accessToken = sessionStorage.getItem('qc_admin_token');
+  var accessToken = null;
+  var refreshToken = null;
+  var tokenExpiresAt = 0; // epoch ms
+  // Renew this long before actual expiry so a mid-request 401 never happens
+  // in practice — this is the fix for "logged out every few minutes."
+  var TOKEN_REFRESH_MARGIN_MS = 60 * 1000;
   var usersData = [];
   var incomeRows = [];
   var waitlistRows = [];
@@ -446,7 +457,60 @@
     { key: 'find_in_closet_uses', label: 'Find in Closet Uses', light: '#1baf7a', dark: '#199e70' },
   ];
 
-  if (accessToken) { loadDashboard(); }
+  (function () {
+    var stored = loadStoredSession();
+    if (!stored) return;
+    accessToken = stored.access_token;
+    refreshToken = stored.refresh_token;
+    tokenExpiresAt = stored.expires_at;
+    ensureFreshToken().then(loadDashboard).catch(function () { clearSession(); });
+  })();
+
+  function loadStoredSession() {
+    var raw = localStorage.getItem('qc_admin_session') || sessionStorage.getItem('qc_admin_session');
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+  }
+
+  function saveSession(body, remember) {
+    var session = {
+      access_token: body.access_token,
+      refresh_token: body.refresh_token,
+      expires_at: Date.now() + (body.expires_in || 3600) * 1000,
+    };
+    accessToken = session.access_token;
+    refreshToken = session.refresh_token;
+    tokenExpiresAt = session.expires_at;
+    localStorage.removeItem('qc_admin_session');
+    sessionStorage.removeItem('qc_admin_session');
+    (remember ? localStorage : sessionStorage).setItem('qc_admin_session', JSON.stringify(session));
+  }
+
+  function clearSession() {
+    accessToken = null;
+    refreshToken = null;
+    tokenExpiresAt = 0;
+    localStorage.removeItem('qc_admin_session');
+    sessionStorage.removeItem('qc_admin_session');
+  }
+
+  // Proactively renews the access token from the refresh token before it
+  // expires. Called at the top of every rpc() call, so an admin left on the
+  // page stays logged in indefinitely instead of hitting a dead 401.
+  function ensureFreshToken() {
+    if (!refreshToken) return Promise.resolve();
+    if (Date.now() < tokenExpiresAt - TOKEN_REFRESH_MARGIN_MS) return Promise.resolve();
+    return fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }).then(function (res) { return res.json().then(function (body) { return { ok: res.ok, body: body }; }); })
+      .then(function (result) {
+        if (!result.ok) throw new Error('Session expired');
+        var remembered = !!localStorage.getItem('qc_admin_session');
+        saveSession(result.body, remembered);
+      });
+  }
 
   function isDarkMode() {
     var stamped = document.documentElement.getAttribute('data-theme');
@@ -481,6 +545,7 @@
     event.preventDefault();
     var email = document.getElementById('email').value.trim();
     var password = document.getElementById('password').value;
+    var remember = document.getElementById('remember-me').checked;
     var btn = document.getElementById('login-btn');
     var err = document.getElementById('login-error');
     err.textContent = '';
@@ -494,8 +559,7 @@
     }).then(function (res) { return res.json().then(function (body) { return { ok: res.ok, body: body }; }); })
       .then(function (result) {
         if (!result.ok) throw new Error(result.body.error_description || result.body.msg || 'Login failed');
-        accessToken = result.body.access_token;
-        sessionStorage.setItem('qc_admin_token', accessToken);
+        saveSession(result.body, remember);
         return loadDashboard();
       })
       .catch(function (e) {
@@ -507,22 +571,23 @@
   }
 
   function logout() {
-    sessionStorage.removeItem('qc_admin_token');
-    accessToken = null;
+    clearSession();
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('logout-btn').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
   }
 
   function rpc(name, params) {
-    return fetch(SUPABASE_URL + '/rest/v1/rpc/' + name, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': 'Bearer ' + accessToken,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params || {}),
+    return ensureFreshToken().then(function () {
+      return fetch(SUPABASE_URL + '/rest/v1/rpc/' + name, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': 'Bearer ' + accessToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params || {}),
+      });
     }).then(function (res) {
       if (!res.ok) return res.json().then(function (b) { throw new Error(b.message || 'Request failed'); });
       return res.json();
