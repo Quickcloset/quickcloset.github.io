@@ -32,3 +32,9 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # GitHub's backend has been taking ~10-13 min to finish a
+          # deployment lately (confirmed via job logs: checkout/upload
+          # succeed instantly, only the post-upload "wait for publish" poll
+          # times out) — comfortably past this action's 10 min default.
+          timeout: 1800000
