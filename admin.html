@@ -236,6 +236,11 @@
   <div class="table-wrap" id="table-wrap"></div>
 
   <div class="section-title" style="margin-top:32px;">
+    <span>Retention <span style="font-weight:500;color:var(--text-3);">— % of each signup cohort active in the last 7 days</span></span>
+  </div>
+  <div class="table-wrap snug" id="retention-table-wrap"></div>
+
+  <div class="section-title" style="margin-top:32px;">
     <span>Waitlist</span>
     <button class="csv-btn" onclick="exportWaitlistCSV()">Export CSV</button>
   </div>
@@ -373,6 +378,7 @@
           refreshRangedData(),
           rpc('admin_get_total_income').then(renderTotalIncomeBanner),
           rpc('admin_get_waitlist').then(renderWaitlistTable),
+          rpc('admin_get_retention').then(renderRetentionTable),
         ]);
       })
       .catch(function (e) {
@@ -530,6 +536,19 @@
         '</tr>';
     }).join('') + '</tbody>';
     wrap.innerHTML = '<table>' + thead + tbody + '</table>';
+  }
+
+  function renderRetentionTable(rows) {
+    var wrap = document.getElementById('retention-table-wrap');
+    if (!rows || rows.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">No signups yet.</div>';
+      return;
+    }
+    var body = rows.map(function (r) {
+      var label = r.cohort_label.replace(/^\d:\s*/, ''); // strip the sort-order prefix (0:, 1:, ...)
+      return '<tr><td>' + label + '</td><td class="num">' + r.cohort_size + '</td><td class="num">' + r.retention_pct + '%</td></tr>';
+    }).join('');
+    wrap.innerHTML = '<table><thead><tr><th>Signed up</th><th>Cohort size</th><th>Active in last 7d</th></tr></thead><tbody>' + body + '</tbody></table>';
   }
 
   function renderWaitlistTable(rows) {
