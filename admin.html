@@ -135,6 +135,8 @@
     background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
     overflow-x: auto; overflow-y: hidden;
   }
+  .table-wrap.snug { max-width: 420px; }
+  .table-wrap.snug table { min-width: 0; width: 100%; }
   table { width: 100%; border-collapse: collapse; min-width: 720px; }
   th, td { padding: 12px 16px; text-align: left; font-size: 13.5px; white-space: nowrap; }
   th {
@@ -234,6 +236,12 @@
   <div class="table-wrap" id="table-wrap"></div>
 
   <div class="section-title" style="margin-top:32px;">
+    <span>Waitlist</span>
+    <button class="csv-btn" onclick="exportWaitlistCSV()">Export CSV</button>
+  </div>
+  <div class="table-wrap snug" id="waitlist-table-wrap"></div>
+
+  <div class="section-title" style="margin-top:32px;">
     <span>Income Report <span style="font-weight:500;color:var(--text-3);">— for SARS / your accountant</span></span>
     <button class="csv-btn" onclick="exportIncomeCSV()">Export CSV</button>
   </div>
@@ -252,6 +260,7 @@
   var accessToken = sessionStorage.getItem('qc_admin_token');
   var usersData = [];
   var incomeRows = [];
+  var waitlistRows = [];
   var sortKey = 'registered_at';
   var sortAsc = false;
   var rangeDays = 30;
@@ -360,7 +369,11 @@
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('dashboard').style.display = 'block';
         document.getElementById('logout-btn').style.display = 'inline-block';
-        return Promise.all([refreshRangedData(), rpc('admin_get_total_income').then(renderTotalIncomeBanner)]);
+        return Promise.all([
+          refreshRangedData(),
+          rpc('admin_get_total_income').then(renderTotalIncomeBanner),
+          rpc('admin_get_waitlist').then(renderWaitlistTable),
+        ]);
       })
       .catch(function (e) {
         if (e.message === 'Not authorized') {
@@ -401,6 +414,7 @@
       ['Sales', o.sales_in_range],
       ['Stylist Uses', o.stylist_uses_in_range],
       ['Find in Closet Uses', o.find_in_closet_uses_in_range],
+      ['Waitlist Signups', o.waitlist_in_range],
     ];
     document.getElementById('stat-row').innerHTML = tiles.map(function (t) {
       return '<div class="stat-tile"><span class="stat-label">' + t[0] + '</span><span class="stat-value num">' + t[1] + '</span></div>';
@@ -516,6 +530,26 @@
         '</tr>';
     }).join('') + '</tbody>';
     wrap.innerHTML = '<table>' + thead + tbody + '</table>';
+  }
+
+  function renderWaitlistTable(rows) {
+    waitlistRows = rows || [];
+    var wrap = document.getElementById('waitlist-table-wrap');
+    if (waitlistRows.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">No signups yet.</div>';
+      return;
+    }
+    var body = waitlistRows.map(function (r) {
+      return '<tr><td>' + escapeHtml(r.email) + '</td><td class="num">' + fmtDate(r.signed_up_at) + '</td></tr>';
+    }).join('');
+    wrap.innerHTML = '<table><thead><tr><th>Email</th><th>Signed Up</th></tr></thead><tbody>' + body + '</tbody></table>';
+  }
+
+  function exportWaitlistCSV() {
+    downloadCSV('quickcloset-waitlist.csv', [
+      ['email', 'Email'],
+      ['signed_up_at', 'Signed Up', function (r) { return fmtDate(r.signed_up_at); }],
+    ], waitlistRows);
   }
 
   function renderTotalIncomeBanner(rows) {
