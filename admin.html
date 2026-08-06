@@ -322,7 +322,7 @@
   </div>
 
   <div class="section-title">
-    <span>Users</span>
+    <span>Users <span style="font-weight:500;color:var(--text-3);">— Sold Amount/Avg Sale Price reflect the date range above; switch ranges to spot trends</span></span>
     <button class="csv-btn" onclick="exportUsersCSV()">Export CSV</button>
   </div>
   <div class="table-wrap" id="table-wrap"></div>
@@ -570,12 +570,15 @@
       rpc('admin_get_income_report', { from_date: bounds.from, to_date: bounds.to }),
       rpc('admin_get_orders', { from_date: bounds.from, to_date: bounds.to }),
       rpc('admin_get_expenses', { from_date: bounds.from, to_date: bounds.to }),
+      rpc('admin_get_users', { from_date: bounds.from, to_date: bounds.to }),
     ]).then(function (results) {
       renderStats(results[0][0]);
       renderChart(results[1]);
       renderIncomeTable(results[2]);
       renderOrdersTable(results[3]);
       renderExpensesTable(results[4]);
+      usersData = results[5];
+      renderTable();
     });
   }
 
@@ -655,6 +658,8 @@
       ['find_in_closet_uses', 'Find in Closet Uses'],
       ['linked_closets_count', 'Linked Closets'],
       ['weather_enabled', 'Weather Enabled', function (r) { return r.weather_enabled ? 'Yes' : 'No'; }],
+      ['amount_sold_in_range', 'Sold Amount in Range (ZAR)'],
+      ['avg_sale_price_in_range', 'Avg Sale Price in Range (ZAR)'],
     ], usersData);
   }
 
@@ -663,6 +668,7 @@
       ['month', 'Month', function (r) { return new Date(r.month + 'T00:00:00Z').toLocaleDateString(undefined, { year: 'numeric', month: 'long' }); }],
       ['orders_count', 'Orders'],
       ['gross_sales', 'Gross Sales (ZAR)'],
+      ['avg_sale_price', 'Avg Sale Price (ZAR)', function (r) { var c = Number(r.orders_count); return c > 0 ? (Number(r.gross_sales) / c).toFixed(2) : ''; }],
       ['transaction_fee_income', 'Transaction Fee Income (ZAR)'],
     ], incomeRows);
   }
@@ -690,6 +696,8 @@
       ['find_in_closet_uses', 'Find in Closet'],
       ['linked_closets_count', 'Linked Closets'],
       ['weather_enabled', 'Weather'],
+      ['amount_sold_in_range', 'Sold Amount'],
+      ['avg_sale_price_in_range', 'Avg Sale Price'],
     ];
     var sorted = usersData.slice().sort(function (a, b) {
       var av = a[sortKey], bv = b[sortKey];
@@ -716,6 +724,8 @@
         '<td class="num">' + u.find_in_closet_uses + '</td>' +
         '<td class="num">' + u.linked_closets_count + '</td>' +
         '<td class="' + (u.weather_enabled ? '' : 'muted') + '">' + (u.weather_enabled ? 'Yes' : '—') + '</td>' +
+        '<td class="num">' + formatRand(u.amount_sold_in_range) + '</td>' +
+        '<td class="num ' + (u.avg_sale_price_in_range == null ? 'muted' : '') + '">' + (u.avg_sale_price_in_range == null ? '—' : formatRand(u.avg_sale_price_in_range)) + '</td>' +
         '</tr>';
     }).join('') + '</tbody>';
     wrap.innerHTML = '<table>' + thead + tbody + '</table>';
@@ -824,25 +834,31 @@
     }
     var totalOrders = 0, totalGross = 0, totalFees = 0;
     var body = rows.map(function (r) {
-      totalOrders += Number(r.orders_count);
-      totalGross += Number(r.gross_sales);
+      var count = Number(r.orders_count);
+      var gross = Number(r.gross_sales);
+      totalOrders += count;
+      totalGross += gross;
       totalFees += Number(r.transaction_fee_income);
+      var avg = count > 0 ? gross / count : null;
       var d = new Date(r.month + 'T00:00:00Z');
       var label = d.toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
       return '<tr>' +
         '<td>' + label + '</td>' +
         '<td class="num">' + r.orders_count + '</td>' +
         '<td class="num">' + formatRand(r.gross_sales) + '</td>' +
+        '<td class="num ' + (avg == null ? 'muted' : '') + '">' + (avg == null ? '—' : formatRand(avg)) + '</td>' +
         '<td class="num">' + formatRand(r.transaction_fee_income) + '</td>' +
         '</tr>';
     }).join('');
+    var totalAvg = totalOrders > 0 ? totalGross / totalOrders : null;
     var foot = '<tr class="table-foot">' +
       '<td>Total</td>' +
       '<td class="num">' + totalOrders + '</td>' +
       '<td class="num">' + formatRand(totalGross) + '</td>' +
+      '<td class="num">' + (totalAvg == null ? '—' : formatRand(totalAvg)) + '</td>' +
       '<td class="num">' + formatRand(totalFees) + '</td>' +
       '</tr>';
-    wrap.innerHTML = '<table><thead><tr><th>Month</th><th>Orders</th><th>Gross Sales</th><th>Fee Income</th></tr></thead><tbody>' +
+    wrap.innerHTML = '<table><thead><tr><th>Month</th><th>Orders</th><th>Gross Sales</th><th>Avg Sale Price</th><th>Fee Income</th></tr></thead><tbody>' +
       body + foot + '</tbody></table>';
   }
 
