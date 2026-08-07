@@ -249,6 +249,26 @@
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
 
+  /* ── Integrations ── */
+  .integration-group-title {
+    font-size: 12px; font-weight: 700; color: var(--text-3); text-transform: uppercase;
+    letter-spacing: 0.06em; margin: 28px 0 12px;
+  }
+  .integration-group-title:first-child { margin-top: 0; }
+  .integration-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .integration-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .integration-name { font-weight: 700; font-size: 14px; color: var(--text); }
+  .integration-desc { font-size: 12.5px; color: var(--text-2); line-height: 1.5; flex-grow: 1; }
+  .integration-env { font-size: 10.5px; color: var(--text-3); font-family: monospace; }
+  .integration-link {
+    font-size: 12px; font-weight: 700; color: var(--sage-deep); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px; margin-top: 4px;
+  }
+  .integration-link:hover { text-decoration: underline; }
+
   /* ── Site pause control ── */
   .site-status-card {
     background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
@@ -387,6 +407,7 @@
     <button class="tab-btn" data-tab="finance" onclick="switchTab('finance')">Finance</button>
     <button class="tab-btn" data-tab="waitlist" onclick="switchTab('waitlist')">Waitlist</button>
     <button class="tab-btn" data-tab="content" onclick="switchTab('content')">Site Content</button>
+    <button class="tab-btn" data-tab="integrations" onclick="switchTab('integrations')">Integrations</button>
     <button class="range-btn print-btn" style="margin-left:auto;" onclick="window.print()">Print / Save as PDF</button>
   </div>
 
@@ -601,6 +622,87 @@
       <p class="expense-error" id="content-error"></p>
       <p class="login-success" id="content-success"></p>
     </form>
+  </div>
+
+  <div class="tab-panel" id="tab-integrations">
+    <div class="section-title">Integrations <span style="font-weight:500;color:var(--text-3);">— every external system QuickCloset depends on to run, in one place</span></div>
+
+    <div class="integration-group-title">Backend &amp; Infrastructure</div>
+    <div class="integration-grid">
+      <div class="integration-card">
+        <span class="integration-name">Supabase</span>
+        <span class="integration-desc">Database, auth, storage, and every Edge Function — the entire backend.</span>
+        <a class="integration-link" href="https://supabase.com/dashboard/project/wyrvlotqsqztmatpwvih" target="_blank" rel="noopener">Open Dashboard →</a>
+      </div>
+      <div class="integration-card">
+        <span class="integration-name">GitHub — App Repo</span>
+        <span class="integration-desc">Source code for the QuickCloset mobile app and Supabase functions/schema.</span>
+        <a class="integration-link" href="https://github.com/Quickcloset/quickcloset" target="_blank" rel="noopener">Open Repo →</a>
+      </div>
+      <div class="integration-card">
+        <span class="integration-name">GitHub — Site &amp; Pages</span>
+        <span class="integration-desc">Hosts and deploys the marketing site and this admin portal (GitHub Actions).</span>
+        <a class="integration-link" href="https://github.com/Quickcloset/quickcloset.github.io" target="_blank" rel="noopener">Open Repo →</a>
+      </div>
+      <div class="integration-card">
+        <span class="integration-name">Domain — quickcloset.co.za</span>
+        <span class="integration-desc">Custom domain for the site, pointed at GitHub Pages. Renewal happens with whichever registrar it was bought through — not something this portal can look up.</span>
+        <a class="integration-link" href="https://github.com/Quickcloset/quickcloset.github.io/settings/pages" target="_blank" rel="noopener">Open Pages/DNS Settings →</a>
+      </div>
+    </div>
+
+    <div class="integration-group-title">Payments &amp; Fulfillment</div>
+    <div class="integration-grid">
+      <div class="integration-card">
+        <span class="integration-name">Paystack</span>
+        <span class="integration-desc">Checkout, transaction verification, and seller payouts (bank transfers).</span>
+        <span class="integration-env">PAYSTACK_SECRET_KEY</span>
+        <a class="integration-link" href="https://dashboard.paystack.com/" target="_blank" rel="noopener">Open Dashboard →</a>
+      </div>
+      <div class="integration-card">
+        <span class="integration-name">Bob Go</span>
+        <span class="integration-desc">Courier rate quotes, booking, and tracking for "shipping" sales.</span>
+        <span class="integration-env">BOBGO_API_KEY</span>
+        <a class="integration-link" href="https://my.bobgo.co.za/" target="_blank" rel="noopener">Open Dashboard →</a>
+      </div>
+    </div>
+
+    <div class="integration-group-title">AI &amp; Data</div>
+    <div class="integration-grid">
+      <div class="integration-card">
+        <span class="integration-name">Groq</span>
+        <span class="integration-desc">Powers the AI Stylist and Find in Closet features (vision + language model).</span>
+        <span class="integration-env">EXPO_PUBLIC_GROQ_KEY</span>
+        <a class="integration-link" href="https://console.groq.com/keys" target="_blank" rel="noopener">Open Console →</a>
+      </div>
+      <div class="integration-card">
+        <span class="integration-name">remove.bg</span>
+        <span class="integration-desc">Removes backgrounds from closet item photos on upload.</span>
+        <span class="integration-env">EXPO_PUBLIC_REMOVE_BG_KEY</span>
+        <a class="integration-link" href="https://www.remove.bg/api" target="_blank" rel="noopener">Open Account →</a>
+      </div>
+      <div class="integration-card">
+        <span class="integration-name">Hugging Face</span>
+        <span class="integration-desc">Fallback background removal, used only once remove.bg's free quota runs out.</span>
+        <span class="integration-env">EXPO_PUBLIC_HUGGINGFACE_KEY</span>
+        <a class="integration-link" href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Open Account →</a>
+      </div>
+      <div class="integration-card">
+        <span class="integration-name">OpenWeatherMap</span>
+        <span class="integration-desc">Weather-based outfit suggestions and city search.</span>
+        <span class="integration-env">EXPO_PUBLIC_OPENWEATHER_KEY</span>
+        <a class="integration-link" href="https://home.openweathermap.org/" target="_blank" rel="noopener">Open Account →</a>
+      </div>
+    </div>
+
+    <div class="integration-group-title">App Distribution</div>
+    <div class="integration-grid">
+      <div class="integration-card">
+        <span class="integration-name">Expo / EAS</span>
+        <span class="integration-desc">Builds the app, ships OTA updates, and relays push notifications.</span>
+        <a class="integration-link" href="https://expo.dev/accounts/adeledv1/projects/quickcloset" target="_blank" rel="noopener">Open Project →</a>
+      </div>
+    </div>
   </div>
 </div>
 
