@@ -234,6 +234,21 @@
   .modal-row-sub { color: var(--text-3); font-size: 11.5px; }
   .modal-empty { color: var(--text-3); font-size: 12.5px; padding: 6px 0; }
 
+  /* ── Tabs ── */
+  .tab-bar {
+    display: flex; align-items: center; gap: 4px; margin-bottom: 24px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    font-size: 13px; font-weight: 700; color: var(--text-2); background: none; border: none;
+    padding: 10px 14px; cursor: pointer; font-family: 'Manrope', sans-serif;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tab-btn:hover { color: var(--sage-deep); }
+  .tab-btn.active { color: var(--sage-deep); border-bottom-color: var(--sage); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
   /* ── Site pause control ── */
   .site-status-card {
     background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
@@ -259,11 +274,12 @@
   .expense-field label {
     font-size: 10px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em;
   }
-  .expense-field input {
+  .expense-field input, .expense-field textarea {
     height: 38px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--sand);
     padding: 0 10px; font-size: 13px; color: var(--text); font-family: 'Manrope', sans-serif; width: 100%;
   }
-  .expense-field input:focus { outline: 2px solid var(--sage); outline-offset: 1px; }
+  .expense-field textarea { height: auto; padding: 8px 10px; resize: vertical; }
+  .expense-field input:focus, .expense-field textarea:focus { outline: 2px solid var(--sage); outline-offset: 1px; }
   .expense-field.amount input { max-width: 110px; }
   .expense-field.date input { max-width: 140px; }
   .expense-actions { display: flex; gap: 8px; }
@@ -295,12 +311,14 @@
     }
     body { background: #fff; }
     header, .range-row, .csv-btn, .logout-btn, #chart-tooltip, .modal-overlay,
-    .expense-form, .row-action, .site-status-card { display: none !important; }
+    .expense-form, .row-action, .site-status-card, .tab-bar { display: none !important; }
     .stat-tile, .table-wrap, .chart-card, .total-income-banner, .login-card { box-shadow: none !important; }
     .table-wrap { overflow: visible; }
     table { min-width: 0; }
     #dashboard { padding: 0; max-width: 100%; }
     .stat-row, .chart-card, .table-wrap, .total-income-banner { break-inside: avoid; }
+    /* Printing always dumps the full report, regardless of the active tab. */
+    .tab-panel { display: block !important; }
   }
 </style>
 
@@ -360,128 +378,230 @@
 </div>
 
 <div id="dashboard">
-  <div class="site-status-card">
-    <div class="site-status-row">
-      <span class="pill" id="site-status-pill">Loading…</span>
-      <span class="site-status-label">Public site (quickcloset.co.za)</span>
-      <button class="expense-btn" id="site-pause-toggle-btn" style="margin-left:auto;" onclick="toggleSitePaused()">…</button>
-    </div>
-    <label class="field-label" for="pause-message">Message shown to visitors while paused</label>
-    <textarea class="field-input pause-textarea" id="pause-message" rows="2"></textarea>
-    <div class="site-status-actions">
-      <button class="expense-btn cancel" onclick="savePauseMessage()">Save Message</button>
-    </div>
-    <p class="expense-error" id="site-status-error"></p>
-  </div>
-
-  <div class="range-row" id="range-row">
-    <span class="range-label">Range:</span>
-    <button class="range-btn" data-days="7" onclick="setRange(7)">7 days</button>
-    <button class="range-btn active" data-days="30" onclick="setRange(30)">30 days</button>
-    <button class="range-btn" data-days="90" onclick="setRange(90)">90 days</button>
-    <button class="range-btn" data-days="all" onclick="setRange('all')">All time</button>
+  <div class="tab-bar" id="tab-bar">
+    <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn" data-tab="users" onclick="switchTab('users')">Users</button>
+    <button class="tab-btn" data-tab="marketplace" onclick="switchTab('marketplace')">Marketplace</button>
+    <button class="tab-btn" data-tab="payments" onclick="switchTab('payments')">Payments</button>
+    <button class="tab-btn" data-tab="courier" onclick="switchTab('courier')">Courier</button>
+    <button class="tab-btn" data-tab="finance" onclick="switchTab('finance')">Finance</button>
+    <button class="tab-btn" data-tab="waitlist" onclick="switchTab('waitlist')">Waitlist</button>
+    <button class="tab-btn" data-tab="content" onclick="switchTab('content')">Site Content</button>
     <button class="range-btn print-btn" style="margin-left:auto;" onclick="window.print()">Print / Save as PDF</button>
   </div>
 
-  <div class="stat-row" id="stat-row"></div>
-
-  <div class="section-title">Usage over time</div>
-  <div class="chart-card">
-    <div class="chart-legend" id="chart-legend"></div>
-    <div class="chart-svg-wrap" id="chart-svg-wrap"></div>
-  </div>
-
-  <div class="section-title">
-    <span>Users <span style="font-weight:500;color:var(--text-3);">— Sold Amount/Avg Sale Price reflect the date range above; switch ranges to spot trends</span></span>
-    <button class="csv-btn" onclick="exportUsersCSV()">Export CSV</button>
-  </div>
-  <div class="table-wrap" id="table-wrap"></div>
-
-  <div class="section-title" style="margin-top:32px;">
-    <span>Retention <span style="font-weight:500;color:var(--text-3);">— % of each signup cohort active in the last 7 days</span></span>
-  </div>
-  <div class="table-wrap snug" id="retention-table-wrap"></div>
-
-  <div class="section-title" style="margin-top:32px;">
-    <span>Waitlist</span>
-    <button class="csv-btn" onclick="exportWaitlistCSV()">Export CSV</button>
-  </div>
-  <div class="table-wrap snug" id="waitlist-table-wrap"></div>
-
-  <div class="section-title" style="margin-top:32px;">
-    <span>Income Report <span style="font-weight:500;color:var(--text-3);">— for SARS / your accountant</span></span>
-    <button class="csv-btn" onclick="exportIncomeCSV()">Export CSV</button>
-  </div>
-  <p class="income-note">
-    Transaction fee income is real, from <code>orders.platform_fee</code> — it reads R0 because the fee has been
-    set to 0% this whole time, not because tracking is broken. Subscription income isn't shown: no recurring
-    billing exists in the app yet, so there's nothing real to report there.
-  </p>
-  <div class="total-income-banner" id="total-income-banner"></div>
-  <div class="table-wrap" id="income-table-wrap"></div>
-
-  <div class="section-title" style="margin-top:32px;">
-    <span>Expenses <span style="font-weight:500;color:var(--text-3);">— logged manually; nets against income above</span></span>
-    <button class="csv-btn" onclick="exportExpensesCSV()">Export CSV</button>
-  </div>
-  <form class="expense-form" onsubmit="return submitExpenseForm(event)">
-    <input type="hidden" id="expense-edit-id" value="" />
-    <div class="expense-field date">
-      <label for="expense-date">Date</label>
-      <input type="date" id="expense-date" required />
+  <div class="tab-panel active" id="tab-overview">
+    <div class="site-status-card">
+      <div class="site-status-row">
+        <span class="pill" id="site-status-pill">Loading…</span>
+        <span class="site-status-label">Public site (quickcloset.co.za)</span>
+        <button class="expense-btn" id="site-pause-toggle-btn" style="margin-left:auto;" onclick="toggleSitePaused()">…</button>
+      </div>
+      <label class="field-label" for="pause-message">Message shown to visitors while paused</label>
+      <textarea class="field-input pause-textarea" id="pause-message" rows="2"></textarea>
+      <div class="site-status-actions">
+        <button class="expense-btn cancel" onclick="savePauseMessage()">Save Message</button>
+      </div>
+      <p class="expense-error" id="site-status-error"></p>
     </div>
-    <div class="expense-field grow">
-      <label for="expense-category">Category</label>
-      <input type="text" id="expense-category" list="expense-category-options" placeholder="e.g. Hosting" required />
-      <datalist id="expense-category-options">
-        <option value="Hosting"></option>
-        <option value="App Store Fees"></option>
-        <option value="Software Subscriptions"></option>
-        <option value="Domain"></option>
-        <option value="Courier / Bob Go"></option>
-        <option value="Payment Processing Fees"></option>
-        <option value="Marketing"></option>
-        <option value="Legal & Compliance"></option>
-        <option value="Other"></option>
-      </datalist>
-    </div>
-    <div class="expense-field grow">
-      <label for="expense-description">Description</label>
-      <input type="text" id="expense-description" placeholder="What was this for?" required />
-    </div>
-    <div class="expense-field amount">
-      <label for="expense-amount">Amount (ZAR)</label>
-      <input type="number" id="expense-amount" step="0.01" min="0.01" required />
-    </div>
-    <div class="expense-field grow">
-      <label for="expense-notes">Notes (optional)</label>
-      <input type="text" id="expense-notes" placeholder="Reference, invoice #, etc." />
-    </div>
-    <div class="expense-actions">
-      <button type="submit" class="expense-btn" id="expense-submit-btn">Add Expense</button>
-      <button type="button" class="expense-btn cancel" id="expense-cancel-btn" style="display:none;" onclick="cancelExpenseEdit()">Cancel</button>
-    </div>
-    <p class="expense-error" id="expense-error"></p>
-  </form>
-  <div class="table-wrap" id="expenses-table-wrap"></div>
 
-  <div class="section-title" style="margin-top:32px;">
-    <span>Orders <span style="font-weight:500;color:var(--text-3);">— every order in the selected range</span></span>
-    <button class="csv-btn" onclick="exportOrdersCSV()">Export CSV</button>
-  </div>
-  <div class="table-wrap" id="orders-table-wrap"></div>
+    <div class="range-row" id="range-row">
+      <span class="range-label">Range:</span>
+      <button class="range-btn" data-days="7" onclick="setRange(7)">7 days</button>
+      <button class="range-btn active" data-days="30" onclick="setRange(30)">30 days</button>
+      <button class="range-btn" data-days="90" onclick="setRange(90)">90 days</button>
+      <button class="range-btn" data-days="all" onclick="setRange('all')">All time</button>
+    </div>
 
-  <div class="section-title" style="margin-top:32px;">
-    <span>Disputes <span style="font-weight:500;color:var(--text-3);">— all-time, not affected by the date range</span></span>
-    <button class="csv-btn" onclick="exportDisputesCSV()">Export CSV</button>
-  </div>
-  <div class="table-wrap" id="disputes-table-wrap"></div>
+    <div class="stat-row" id="stat-row"></div>
 
-  <div class="section-title" style="margin-top:32px;">
-    <span>Payouts <span style="font-weight:500;color:var(--text-3);">— seller cash-outs to their bank account, all-time</span></span>
-    <button class="csv-btn" onclick="exportPayoutsCSV()">Export CSV</button>
+    <div class="section-title">Usage over time</div>
+    <div class="chart-card">
+      <div class="chart-legend" id="chart-legend"></div>
+      <div class="chart-svg-wrap" id="chart-svg-wrap"></div>
+    </div>
   </div>
-  <div class="table-wrap" id="payouts-table-wrap"></div>
+
+  <div class="tab-panel" id="tab-users">
+    <div class="section-title">
+      <span>Users <span style="font-weight:500;color:var(--text-3);">— Sold Amount/Avg Sale Price reflect the Overview tab's date range; switch ranges to spot trends</span></span>
+      <button class="csv-btn" onclick="exportUsersCSV()">Export CSV</button>
+    </div>
+    <div class="table-wrap" id="table-wrap"></div>
+
+    <div class="section-title" style="margin-top:32px;">
+      <span>Retention <span style="font-weight:500;color:var(--text-3);">— % of each signup cohort active in the last 7 days</span></span>
+    </div>
+    <div class="table-wrap snug" id="retention-table-wrap"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-marketplace">
+    <div class="section-title">
+      <span>Orders <span style="font-weight:500;color:var(--text-3);">— every order in the selected range (see Overview tab)</span></span>
+      <button class="csv-btn" onclick="exportOrdersCSV()">Export CSV</button>
+    </div>
+    <div class="table-wrap" id="orders-table-wrap"></div>
+
+    <div class="section-title" style="margin-top:32px;">
+      <span>Disputes <span style="font-weight:500;color:var(--text-3);">— all-time, not affected by the date range</span></span>
+      <button class="csv-btn" onclick="exportDisputesCSV()">Export CSV</button>
+    </div>
+    <div class="table-wrap" id="disputes-table-wrap"></div>
+
+    <div class="section-title" style="margin-top:32px;">
+      <span>Payouts <span style="font-weight:500;color:var(--text-3);">— seller cash-outs to their bank account, all-time</span></span>
+      <button class="csv-btn" onclick="exportPayoutsCSV()">Export CSV</button>
+    </div>
+    <div class="table-wrap" id="payouts-table-wrap"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-payments">
+    <div class="site-status-card">
+      <div class="site-status-row">
+        <span class="pill" id="payments-status-pill">Loading…</span>
+        <span class="site-status-label">Paystack checkout</span>
+        <button class="expense-btn" id="payments-toggle-btn" style="margin-left:auto;" onclick="togglePaymentsEnabled()">…</button>
+      </div>
+      <p class="income-note" style="margin-bottom:0;">When disabled, new checkouts are blocked with a clear message. Orders already in progress are unaffected.</p>
+    </div>
+
+    <div class="section-title">Order status breakdown <span style="font-weight:500;color:var(--text-3);">— selected date range, from Paystack-confirmed order data</span></div>
+    <div class="stat-row" id="payments-stat-row"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-courier">
+    <div class="site-status-card">
+      <div class="site-status-row">
+        <span class="pill" id="courier-status-pill">Loading…</span>
+        <span class="site-status-label">Bob Go courier booking</span>
+        <button class="expense-btn" id="courier-toggle-btn" style="margin-left:auto;" onclick="toggleCourierEnabled()">…</button>
+      </div>
+      <p class="income-note" style="margin-bottom:0;">When disabled, sold "shipping" orders skip real courier booking and stay pending for manual arrangement — nothing about the sale itself is affected.</p>
+    </div>
+
+    <div class="section-title">Shipment status breakdown <span style="font-weight:500;color:var(--text-3);">— all-time</span></div>
+    <div class="stat-row" id="courier-stat-row"></div>
+
+    <div class="section-title" style="margin-top:32px;">
+      <span>Shipments <span style="font-weight:500;color:var(--text-3);">— all-time, every Bob Go booking attempt</span></span>
+      <button class="csv-btn" onclick="exportShipmentsCSV()">Export CSV</button>
+    </div>
+    <div class="table-wrap" id="shipments-table-wrap"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-finance">
+    <div class="section-title">
+      <span>Income Report <span style="font-weight:500;color:var(--text-3);">— for SARS / your accountant</span></span>
+      <button class="csv-btn" onclick="exportIncomeCSV()">Export CSV</button>
+    </div>
+    <p class="income-note">
+      Transaction fee income is real, from <code>orders.platform_fee</code> — it reads R0 because the fee has been
+      set to 0% this whole time, not because tracking is broken. Subscription income isn't shown: no recurring
+      billing exists in the app yet, so there's nothing real to report there.
+    </p>
+    <div class="total-income-banner" id="total-income-banner"></div>
+    <div class="table-wrap" id="income-table-wrap"></div>
+
+    <div class="section-title" style="margin-top:32px;">
+      <span>Expenses <span style="font-weight:500;color:var(--text-3);">— logged manually; nets against income above</span></span>
+      <button class="csv-btn" onclick="exportExpensesCSV()">Export CSV</button>
+    </div>
+    <form class="expense-form" onsubmit="return submitExpenseForm(event)">
+      <input type="hidden" id="expense-edit-id" value="" />
+      <div class="expense-field date">
+        <label for="expense-date">Date</label>
+        <input type="date" id="expense-date" required />
+      </div>
+      <div class="expense-field grow">
+        <label for="expense-category">Category</label>
+        <input type="text" id="expense-category" list="expense-category-options" placeholder="e.g. Hosting" required />
+        <datalist id="expense-category-options">
+          <option value="Hosting"></option>
+          <option value="App Store Fees"></option>
+          <option value="Software Subscriptions"></option>
+          <option value="Domain"></option>
+          <option value="Courier / Bob Go"></option>
+          <option value="Payment Processing Fees"></option>
+          <option value="Marketing"></option>
+          <option value="Legal & Compliance"></option>
+          <option value="Other"></option>
+        </datalist>
+      </div>
+      <div class="expense-field grow">
+        <label for="expense-description">Description</label>
+        <input type="text" id="expense-description" placeholder="What was this for?" required />
+      </div>
+      <div class="expense-field amount">
+        <label for="expense-amount">Amount (ZAR)</label>
+        <input type="number" id="expense-amount" step="0.01" min="0.01" required />
+      </div>
+      <div class="expense-field grow">
+        <label for="expense-notes">Notes (optional)</label>
+        <input type="text" id="expense-notes" placeholder="Reference, invoice #, etc." />
+      </div>
+      <div class="expense-actions">
+        <button type="submit" class="expense-btn" id="expense-submit-btn">Add Expense</button>
+        <button type="button" class="expense-btn cancel" id="expense-cancel-btn" style="display:none;" onclick="cancelExpenseEdit()">Cancel</button>
+      </div>
+      <p class="expense-error" id="expense-error"></p>
+    </form>
+    <div class="table-wrap" id="expenses-table-wrap"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-waitlist">
+    <div class="section-title">
+      <span>Waitlist</span>
+      <button class="csv-btn" onclick="exportWaitlistCSV()">Export CSV</button>
+    </div>
+    <div class="table-wrap snug" id="waitlist-table-wrap"></div>
+  </div>
+
+  <div class="tab-panel" id="tab-content">
+    <div class="section-title">Site Content <span style="font-weight:500;color:var(--text-3);">— edits appear on quickcloset.co.za within seconds, no redeploy needed</span></div>
+    <form class="expense-form" style="flex-direction:column; align-items:stretch;" onsubmit="return saveSiteContent(event)">
+      <div class="expense-field grow">
+        <label for="content-hero_title">Hero headline</label>
+        <input type="text" id="content-hero_title" />
+      </div>
+      <div class="expense-field grow">
+        <label for="content-hero_lede">Hero subtext</label>
+        <textarea id="content-hero_lede" rows="2"></textarea>
+      </div>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div class="expense-field">
+          <label for="content-marketplace_price_1">Marketplace card 1 — price</label>
+          <input type="text" id="content-marketplace_price_1" style="max-width:120px;" />
+        </div>
+        <div class="expense-field grow">
+          <label for="content-marketplace_name_1">Marketplace card 1 — label</label>
+          <input type="text" id="content-marketplace_name_1" />
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div class="expense-field">
+          <label for="content-marketplace_price_2">Marketplace card 2 — price</label>
+          <input type="text" id="content-marketplace_price_2" style="max-width:120px;" />
+        </div>
+        <div class="expense-field grow">
+          <label for="content-marketplace_name_2">Marketplace card 2 — label</label>
+          <input type="text" id="content-marketplace_name_2" />
+        </div>
+      </div>
+      <div class="expense-field grow">
+        <label for="content-waitlist_title">Waitlist section headline</label>
+        <input type="text" id="content-waitlist_title" />
+      </div>
+      <div class="expense-field grow">
+        <label for="content-waitlist_subtitle">Waitlist section subtext</label>
+        <textarea id="content-waitlist_subtitle" rows="2"></textarea>
+      </div>
+      <div class="expense-actions">
+        <button type="submit" class="expense-btn">Save Changes</button>
+      </div>
+      <p class="expense-error" id="content-error"></p>
+      <p class="login-success" id="content-success"></p>
+    </form>
+  </div>
 </div>
 
 <div class="modal-overlay" id="user-modal-overlay" onclick="if (event.target === this) closeUserModal();">
@@ -759,23 +879,21 @@
     });
   }
 
-  function restGet(path) {
-    return ensureFreshToken().then(function () {
-      return fetch(SUPABASE_URL + '/rest/v1/' + path, {
-        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + accessToken },
-      });
-    }).then(function (res) {
-      if (!res.ok) return res.json().then(function (b) { throw new Error(b.message || 'Request failed'); });
-      return res.json();
-    });
+  var siteStatus = { site_paused: false, pause_message: '', payments_enabled: true, courier_enabled: true };
+
+  function switchTab(name) {
+    var buttons = document.querySelectorAll('.tab-btn');
+    for (var i = 0; i < buttons.length; i++) buttons[i].classList.toggle('active', buttons[i].getAttribute('data-tab') === name);
+    var panels = document.querySelectorAll('.tab-panel');
+    for (var j = 0; j < panels.length; j++) panels[j].classList.toggle('active', panels[j].id === 'tab-' + name);
   }
 
-  var siteStatus = { site_paused: false, pause_message: '' };
-
   function loadSiteStatus() {
-    return restGet('site_settings?select=site_paused,pause_message&id=is.true').then(function (rows) {
+    return rpc('admin_get_site_status').then(function (rows) {
       if (rows && rows[0]) siteStatus = rows[0];
       renderSiteStatus();
+      renderPaymentsStatus();
+      renderCourierStatus();
     });
   }
 
@@ -814,6 +932,143 @@
       .catch(function (e) { err.textContent = e.message; });
   }
 
+  function renderPaymentsStatus() {
+    var pill = document.getElementById('payments-status-pill');
+    pill.textContent = siteStatus.payments_enabled ? 'Enabled' : 'Disabled';
+    pill.className = 'pill ' + (siteStatus.payments_enabled ? 'pill-good' : 'pill-bad');
+    var btn = document.getElementById('payments-toggle-btn');
+    btn.textContent = siteStatus.payments_enabled ? 'Disable Payments' : 'Enable Payments';
+    btn.className = 'expense-btn' + (siteStatus.payments_enabled ? ' warn' : '');
+  }
+
+  function togglePaymentsEnabled() {
+    var goingEnabled = !siteStatus.payments_enabled;
+    if (!goingEnabled && !window.confirm('This blocks every new checkout on QuickCloset right now. Continue?')) return;
+    rpc('admin_set_payments_enabled', { p_enabled: goingEnabled })
+      .then(function () { siteStatus.payments_enabled = goingEnabled; renderPaymentsStatus(); })
+      .catch(function (e) { window.alert(e.message); });
+  }
+
+  function renderCourierStatus() {
+    var pill = document.getElementById('courier-status-pill');
+    pill.textContent = siteStatus.courier_enabled ? 'Enabled' : 'Disabled';
+    pill.className = 'pill ' + (siteStatus.courier_enabled ? 'pill-good' : 'pill-bad');
+    var btn = document.getElementById('courier-toggle-btn');
+    btn.textContent = siteStatus.courier_enabled ? 'Disable Courier Booking' : 'Enable Courier Booking';
+    btn.className = 'expense-btn' + (siteStatus.courier_enabled ? ' warn' : '');
+  }
+
+  function toggleCourierEnabled() {
+    var goingEnabled = !siteStatus.courier_enabled;
+    if (!goingEnabled && !window.confirm('New "shipping" sales will stop auto-booking couriers and stay pending for manual arrangement. Continue?')) return;
+    rpc('admin_set_courier_enabled', { p_enabled: goingEnabled })
+      .then(function () { siteStatus.courier_enabled = goingEnabled; renderCourierStatus(); })
+      .catch(function (e) { window.alert(e.message); });
+  }
+
+  function renderPaymentsSummary(rows) {
+    var wrap = document.getElementById('payments-stat-row');
+    var counts = {};
+    var totalFees = 0;
+    (rows || []).forEach(function (r) {
+      counts[r.status] = (counts[r.status] || 0) + 1;
+      totalFees += Number(r.platform_fee || 0);
+    });
+    var tiles = [
+      ['Paid', counts.paid || 0],
+      ['Pending Payment', counts.pending_payment || 0],
+      ['Failed', counts.failed || 0],
+      ['Refunded', counts.refunded || 0],
+      ['Fee Income', formatRand(totalFees)],
+    ];
+    wrap.innerHTML = tiles.map(function (t) {
+      return '<div class="stat-tile"><span class="stat-label">' + t[0] + '</span><span class="stat-value num">' + t[1] + '</span></div>';
+    }).join('');
+  }
+
+  function renderCourierSummary(rows) {
+    var wrap = document.getElementById('courier-stat-row');
+    var counts = {};
+    (rows || []).forEach(function (r) { counts[r.status] = (counts[r.status] || 0) + 1; });
+    var tiles = [
+      ['Pending', counts.pending || 0],
+      ['Booked', counts.booked || 0],
+      ['In Transit', (counts.collected || 0) + (counts.in_transit || 0)],
+      ['Delivered', counts.delivered || 0],
+      ['Failed', counts.failed || 0],
+    ];
+    wrap.innerHTML = tiles.map(function (t) {
+      return '<div class="stat-tile"><span class="stat-label">' + t[0] + '</span><span class="stat-value num">' + t[1] + '</span></div>';
+    }).join('');
+  }
+
+  var shipmentsRows = [];
+
+  function renderShipmentsTable(rows) {
+    shipmentsRows = rows || [];
+    renderCourierSummary(shipmentsRows);
+    var wrap = document.getElementById('shipments-table-wrap');
+    if (shipmentsRows.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">No shipments booked yet.</div>';
+      return;
+    }
+    var body = shipmentsRows.map(function (s) {
+      return '<tr>' +
+        '<td>' + escapeHtml(s.buyer_username) + '</td>' +
+        '<td>' + escapeHtml(s.seller_username) + '</td>' +
+        '<td class="num">' + formatRand(s.courier_fee) + '</td>' +
+        '<td>' + (s.courier_name ? escapeHtml(s.courier_name) : '<span class="muted">—</span>') + '</td>' +
+        '<td>' + pillHtml(s.status) + '</td>' +
+        '<td>' + (s.booking_error ? escapeHtml(s.booking_error) : '<span class="muted">—</span>') + '</td>' +
+        '<td class="num">' + fmtDate(s.created_at) + '</td>' +
+        '</tr>';
+    }).join('');
+    wrap.innerHTML = '<table><thead><tr><th>Buyer</th><th>Seller</th><th>Courier Fee</th><th>Courier</th><th>Status</th><th>Note</th><th>Created</th></tr></thead><tbody>' +
+      body + '</tbody></table>';
+  }
+
+  function exportShipmentsCSV() {
+    downloadCSV('quickcloset-shipments.csv', [
+      ['buyer_username', 'Buyer'],
+      ['seller_username', 'Seller'],
+      ['courier_fee', 'Courier Fee (ZAR)'],
+      ['courier_name', 'Courier'],
+      ['status', 'Status'],
+      ['booking_error', 'Note'],
+      ['created_at', 'Created', function (r) { return fmtDate(r.created_at); }],
+    ], shipmentsRows);
+  }
+
+  var siteContentRows = [];
+  var SITE_CONTENT_KEYS = ['hero_title', 'hero_lede', 'marketplace_price_1', 'marketplace_name_1', 'marketplace_price_2', 'marketplace_name_2', 'waitlist_title', 'waitlist_subtitle'];
+
+  function loadSiteContentEditor() {
+    return rpc('admin_get_site_content').then(function (rows) {
+      siteContentRows = rows || [];
+      siteContentRows.forEach(function (r) {
+        var el = document.getElementById('content-' + r.key);
+        if (el) el.value = r.value;
+      });
+    });
+  }
+
+  function saveSiteContent(event) {
+    event.preventDefault();
+    var err = document.getElementById('content-error');
+    var success = document.getElementById('content-success');
+    err.textContent = '';
+    success.textContent = '';
+    var updates = {};
+    SITE_CONTENT_KEYS.forEach(function (k) {
+      var el = document.getElementById('content-' + k);
+      if (el) updates[k] = el.value;
+    });
+    rpc('admin_set_site_content', { p_updates: updates })
+      .then(function () { success.textContent = 'Saved — live on the site now.'; })
+      .catch(function (e) { err.textContent = e.message; });
+    return false;
+  }
+
   function loadDashboard() {
     var err = document.getElementById('login-error');
     return rpc('admin_get_users')
@@ -832,6 +1087,8 @@
           rpc('admin_get_retention').then(renderRetentionTable),
           rpc('admin_get_disputes').then(renderDisputesTable),
           rpc('admin_get_payouts').then(renderPayoutsTable),
+          rpc('admin_get_shipments').then(renderShipmentsTable),
+          loadSiteContentEditor(),
           loadSiteStatus(),
         ]);
       })
@@ -1259,6 +1516,7 @@
 
   function renderOrdersTable(rows) {
     ordersRows = rows || [];
+    renderPaymentsSummary(ordersRows);
     var wrap = document.getElementById('orders-table-wrap');
     if (!rows || rows.length === 0) {
       wrap.innerHTML = '<div class="empty-state">No orders in this range.</div>';
