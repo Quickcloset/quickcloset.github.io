@@ -234,6 +234,20 @@
   .modal-row-sub { color: var(--text-3); font-size: 11.5px; }
   .modal-empty { color: var(--text-3); font-size: 12.5px; padding: 6px 0; }
 
+  /* ── Site pause control ── */
+  .site-status-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px; margin-bottom: 20px;
+  }
+  .site-status-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .site-status-label { font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .pause-textarea {
+    height: auto; padding: 10px 14px; resize: vertical; font-family: 'Manrope', sans-serif;
+    margin-bottom: 10px;
+  }
+  .site-status-actions { display: flex; }
+  .expense-btn.warn { background: var(--error); }
+
   /* ── Expenses ── */
   .expense-form {
     display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
@@ -281,7 +295,7 @@
     }
     body { background: #fff; }
     header, .range-row, .csv-btn, .logout-btn, #chart-tooltip, .modal-overlay,
-    .expense-form, .row-action { display: none !important; }
+    .expense-form, .row-action, .site-status-card { display: none !important; }
     .stat-tile, .table-wrap, .chart-card, .total-income-banner, .login-card { box-shadow: none !important; }
     .table-wrap { overflow: visible; }
     table { min-width: 0; }
@@ -346,6 +360,20 @@
 </div>
 
 <div id="dashboard">
+  <div class="site-status-card">
+    <div class="site-status-row">
+      <span class="pill" id="site-status-pill">Loading…</span>
+      <span class="site-status-label">Public site (quickcloset.co.za)</span>
+      <button class="expense-btn" id="site-pause-toggle-btn" style="margin-left:auto;" onclick="toggleSitePaused()">…</button>
+    </div>
+    <label class="field-label" for="pause-message">Message shown to visitors while paused</label>
+    <textarea class="field-input pause-textarea" id="pause-message" rows="2"></textarea>
+    <div class="site-status-actions">
+      <button class="expense-btn cancel" onclick="savePauseMessage()">Save Message</button>
+    </div>
+    <p class="expense-error" id="site-status-error"></p>
+  </div>
+
   <div class="range-row" id="range-row">
     <span class="range-label">Range:</span>
     <button class="range-btn" data-days="7" onclick="setRange(7)">7 days</button>
@@ -731,6 +759,61 @@
     });
   }
 
+  function restGet(path) {
+    return ensureFreshToken().then(function () {
+      return fetch(SUPABASE_URL + '/rest/v1/' + path, {
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + accessToken },
+      });
+    }).then(function (res) {
+      if (!res.ok) return res.json().then(function (b) { throw new Error(b.message || 'Request failed'); });
+      return res.json();
+    });
+  }
+
+  var siteStatus = { site_paused: false, pause_message: '' };
+
+  function loadSiteStatus() {
+    return restGet('site_settings?select=site_paused,pause_message&id=is.true').then(function (rows) {
+      if (rows && rows[0]) siteStatus = rows[0];
+      renderSiteStatus();
+    });
+  }
+
+  function renderSiteStatus() {
+    var pill = document.getElementById('site-status-pill');
+    pill.textContent = siteStatus.site_paused ? 'Paused' : 'Live';
+    pill.className = 'pill ' + (siteStatus.site_paused ? 'pill-bad' : 'pill-good');
+    var btn = document.getElementById('site-pause-toggle-btn');
+    btn.textContent = siteStatus.site_paused ? 'Resume Site' : 'Pause Site';
+    btn.className = 'expense-btn' + (siteStatus.site_paused ? '' : ' warn');
+    document.getElementById('pause-message').value = siteStatus.pause_message || '';
+  }
+
+  function toggleSitePaused() {
+    var err = document.getElementById('site-status-error');
+    err.textContent = '';
+    var goingPaused = !siteStatus.site_paused;
+    if (goingPaused && !window.confirm('This takes quickcloset.co.za offline for visitors right now. Continue?')) return;
+    var msg = document.getElementById('pause-message').value.trim();
+    rpc('admin_set_site_paused', { p_paused: goingPaused, p_message: msg || null })
+      .then(function () {
+        siteStatus.site_paused = goingPaused;
+        if (msg) siteStatus.pause_message = msg;
+        renderSiteStatus();
+      })
+      .catch(function (e) { err.textContent = e.message; });
+  }
+
+  function savePauseMessage() {
+    var err = document.getElementById('site-status-error');
+    err.textContent = '';
+    var msg = document.getElementById('pause-message').value.trim();
+    if (!msg) { err.textContent = 'Message cannot be empty.'; return; }
+    rpc('admin_set_site_paused', { p_paused: siteStatus.site_paused, p_message: msg })
+      .then(function () { siteStatus.pause_message = msg; })
+      .catch(function (e) { err.textContent = e.message; });
+  }
+
   function loadDashboard() {
     var err = document.getElementById('login-error');
     return rpc('admin_get_users')
@@ -749,6 +832,7 @@
           rpc('admin_get_retention').then(renderRetentionTable),
           rpc('admin_get_disputes').then(renderDisputesTable),
           rpc('admin_get_payouts').then(renderPayoutsTable),
+          loadSiteStatus(),
         ]);
       })
       .catch(function (e) {

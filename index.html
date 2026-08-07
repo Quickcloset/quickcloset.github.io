@@ -323,6 +323,19 @@
     .thread-mark::before { height: 22px; top: -22px; }
     .thread-mark::after { top: -26px; }
   }
+
+  #qc-pause-overlay {
+    position: fixed; inset: 0; z-index: 999; background: var(--sand);
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .qc-pause-card { max-width: 420px; text-align: center; }
+  .qc-pause-mark {
+    width: 52px; height: 52px; border-radius: 16px; background: var(--sage);
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;
+  }
+  .qc-pause-mark svg { width: 26px; height: 26px; }
+  .qc-pause-card h1 { font-size: 26px; margin-bottom: 12px; }
+  .qc-pause-card p { color: var(--text-2); font-size: 15px; line-height: 1.6; }
 </style>
 
 <nav>
@@ -543,6 +556,42 @@
 <script>
   var SUPABASE_URL = 'https://wyrvlotqsqztmatpwvih.supabase.co';
   var SUPABASE_ANON_KEY = 'sb_publishable_y0QJd5N8GlKUX_EszjwFfA_ilIDpdl-';
+
+  // Checked on every load so the admin portal can pause the site without a
+  // redeploy. Fails open on any error — a network hiccup should never take
+  // the real site down, only an explicit admin toggle should.
+  fetch(SUPABASE_URL + '/rest/v1/site_settings?select=site_paused,pause_message&id=is.true', {
+    headers: { apikey: SUPABASE_ANON_KEY },
+  }).then(function (res) { return res.json(); })
+    .then(function (rows) {
+      var row = rows && rows[0];
+      if (row && row.site_paused) showPauseOverlay(row.pause_message);
+    })
+    .catch(function () {});
+
+  function showPauseOverlay(message) {
+    var overlay = document.createElement('div');
+    overlay.id = 'qc-pause-overlay';
+
+    var card = document.createElement('div');
+    card.className = 'qc-pause-card';
+
+    var mark = document.createElement('div');
+    mark.className = 'qc-pause-mark';
+    mark.innerHTML = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 4L12 2L15 4M9 4L4 7V20H20V7L15 4M9 4V7H15V4" stroke="#FBF7F0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    var h1 = document.createElement('h1');
+    h1.textContent = "We'll be right back";
+
+    var p = document.createElement('p');
+    p.textContent = message || "QuickCloset is taking a short break — we'll be back soon.";
+
+    card.appendChild(mark);
+    card.appendChild(h1);
+    card.appendChild(p);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+  }
 
   function submitWaitlist(event) {
     event.preventDefault();
