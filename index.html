@@ -557,6 +557,16 @@
   var SUPABASE_URL = 'https://wyrvlotqsqztmatpwvih.supabase.co';
   var SUPABASE_ANON_KEY = 'sb_publishable_y0QJd5N8GlKUX_EszjwFfA_ilIDpdl-';
 
+  // Lightweight, self-hosted page-view logging — no third-party analytics
+  // account, no cookies, no visitor fingerprinting, just "this path was
+  // loaded, from this referrer, at this time." Fire-and-forget: a failure
+  // here must never affect the page itself.
+  fetch(SUPABASE_URL + '/rest/v1/page_views', {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ path: window.location.pathname, referrer: document.referrer || null }),
+  }).catch(function () {});
+
   // Checked on every load so the admin portal can pause the site without a
   // redeploy. Fails open on any error — a network hiccup should never take
   // the real site down, only an explicit admin toggle should.
