@@ -108,9 +108,9 @@
 
 <p><strong>Location.</strong> If you grant location permission, we store your city name and approximate coordinates to power weather-based outfit suggestions. This is never used to track your precise real-time location, and the app works without it — outfit suggestions just won't be weather-aware.</p>
 
-<p><strong>Shipping and delivery information.</strong> If you buy or sell on the marketplace, we collect a delivery address and phone number, used only to arrange courier collection/delivery or in-person pickup for that transaction.</p>
+<p><strong>Shipping and delivery information.</strong> If you buy or sell on the marketplace, we collect a phone number and either a chosen courier locker pickup point or a delivery address, used only to arrange courier collection/delivery or in-person pickup for that transaction.</p>
 
-<p><strong>Payment and payout information.</strong> Purchases are processed by Paystack — we never see or store your full card number. If you sell items and want to withdraw your balance to a bank account, we store your bank name, account holder name, and the <strong>last 4 digits</strong> of your account number; the full account number is held by Paystack, not us.</p>
+<p><strong>Payment and payout information.</strong> Purchases are processed by Peach Payments — we never see or store your full card number. If you sell items and want to withdraw your balance to a bank account, we store your bank name, account holder name, and the <strong>last 4 digits</strong> of your account number; the full account number is held by Peach Payments, not us.</p>
 
 <p><strong>Marketplace and transaction data.</strong> Listings you create, orders you place or receive, wallet balance and transaction history, and any dispute you file or are named in (including the reason and resolution).</p>
 
@@ -119,7 +119,7 @@
 <p><strong>Waitlist signups.</strong> If you join the waitlist before creating an account, we store only your email address.</p>
 
 <h2>2. What We Don't Collect</h2>
-<p>QuickCloset deliberately does not have in-app buyer/seller chat, so there are no private messages of yours sitting on our servers — contact details needed for a sale are shown on the order itself, not exchanged through a stored inbox. We also never store your full card number or full bank account number — those live with Paystack, our payment processor, not with us.</p>
+<p>QuickCloset deliberately does not have in-app buyer/seller chat, so there are no private messages of yours sitting on our servers — contact details needed for a sale are shown on the order itself, not exchanged through a stored inbox. We also never store your full card number or full bank account number — those live with Peach Payments, our payment processor, not with us.</p>
 
 <h2>3. How We Use Your Information</h2>
 <ul>
@@ -138,8 +138,8 @@
   <thead><tr><th>Provider</th><th>What they receive</th><th>Why</th></tr></thead>
   <tbody>
     <tr><td>Supabase</td><td>All account, closet, and transaction data</td><td>Hosts our database, authentication, and file storage</td></tr>
-    <tr><td>Paystack</td><td>Payment details, bank account for payouts</td><td>Processes checkout and seller payouts</td></tr>
-    <tr><td>Bob Go</td><td>Delivery address, phone number</td><td>Books and tracks courier collection/delivery</td></tr>
+    <tr><td>Peach Payments</td><td>Payment details, bank account for payouts</td><td>Processes checkout and seller payouts</td></tr>
+    <tr><td>PUDO (The Courier Guy)</td><td>Locker pickup point or delivery address, phone number</td><td>Books and tracks courier collection/delivery</td></tr>
     <tr><td>Groq</td><td>Closet photos, style questions (AI Stylist / Find in Closet only)</td><td>Powers AI outfit suggestions and photo matching</td></tr>
     <tr><td>remove.bg / Hugging Face</td><td>The specific photo being processed</td><td>Removes the background from a closet item photo</td></tr>
     <tr><td>OpenWeatherMap</td><td>City name / coordinates</td><td>Weather-based outfit suggestions</td></tr>

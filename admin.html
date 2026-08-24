@@ -502,13 +502,13 @@
     <div class="site-status-card">
       <div class="site-status-row">
         <span class="pill" id="payments-status-pill">Loading…</span>
-        <span class="site-status-label">Paystack checkout</span>
+        <span class="site-status-label">Peach Payments checkout</span>
         <button class="expense-btn" id="payments-toggle-btn" style="margin-left:auto;" onclick="togglePaymentsEnabled()">…</button>
       </div>
       <p class="income-note" style="margin-bottom:0;">When disabled, new checkouts are blocked with a clear message. Orders already in progress are unaffected.</p>
     </div>
 
-    <div class="section-title">Order status breakdown <span style="font-weight:500;color:var(--text-3);">— selected date range, from Paystack-confirmed order data</span></div>
+    <div class="section-title">Order status breakdown <span style="font-weight:500;color:var(--text-3);">— selected date range, from Peach-confirmed order data</span></div>
     <div class="stat-row" id="payments-stat-row"></div>
   </div>
 
@@ -516,7 +516,7 @@
     <div class="site-status-card">
       <div class="site-status-row">
         <span class="pill" id="courier-status-pill">Loading…</span>
-        <span class="site-status-label">Bob Go courier booking</span>
+        <span class="site-status-label">PUDO courier booking</span>
         <button class="expense-btn" id="courier-toggle-btn" style="margin-left:auto;" onclick="toggleCourierEnabled()">…</button>
       </div>
       <p class="income-note" style="margin-bottom:0;">When disabled, sold "shipping" orders skip real courier booking and stay pending for manual arrangement — nothing about the sale itself is affected.</p>
@@ -526,7 +526,7 @@
     <div class="stat-row" id="courier-stat-row"></div>
 
     <div class="section-title" style="margin-top:32px;">
-      <span>Shipments <span style="font-weight:500;color:var(--text-3);">— all-time, every Bob Go booking attempt</span></span>
+      <span>Shipments <span style="font-weight:500;color:var(--text-3);">— all-time, every PUDO booking attempt</span></span>
       <button class="csv-btn" onclick="exportShipmentsCSV()">Export CSV</button>
     </div>
     <div class="table-wrap" id="shipments-table-wrap"></div>
@@ -563,7 +563,7 @@
           <option value="App Store Fees"></option>
           <option value="Software Subscriptions"></option>
           <option value="Domain"></option>
-          <option value="Courier / Bob Go"></option>
+          <option value="Courier / PUDO"></option>
           <option value="Payment Processing Fees"></option>
           <option value="Marketing"></option>
           <option value="Legal & Compliance"></option>
@@ -700,16 +700,17 @@
     <div class="integration-group-title">Payments &amp; Fulfillment</div>
     <div class="integration-grid">
       <div class="integration-card">
-        <span class="integration-name">Paystack</span>
-        <span class="integration-desc">Checkout, transaction verification, and seller payouts (bank transfers).</span>
-        <span class="integration-env">PAYSTACK_SECRET_KEY</span>
-        <a class="integration-link" href="https://dashboard.paystack.com/" target="_blank" rel="noopener">Open Dashboard →</a>
+        <span class="integration-name">Peach Payments</span>
+        <span class="integration-desc">Checkout, transaction verification, and seller payouts (bank transfers) — replaced Paystack (blocked on a Registered Business upgrade). Sandbox only so far; confirmed working end-to-end for a real checkout.</span>
+        <span class="integration-env">Checkout: PEACH_CHECKOUT_ENTITY_ID</span>
+        <span class="integration-env">Payouts: PEACH_PAYOUTS_CLIENT_ID / _CLIENT_SECRET / _MERCHANT_ID</span>
+        <a class="integration-link" href="https://sandbox-dashboard.peachpayments.com/" target="_blank" rel="noopener">Open Dashboard →</a>
       </div>
       <div class="integration-card">
-        <span class="integration-name">Bob Go</span>
-        <span class="integration-desc">Courier rate quotes, booking, and tracking for "shipping" sales.</span>
-        <span class="integration-env">BOBGO_API_KEY</span>
-        <a class="integration-link" href="https://my.bobgo.co.za/" target="_blank" rel="noopener">Open Dashboard →</a>
+        <span class="integration-name">PUDO (The Courier Guy Locker)</span>
+        <span class="integration-desc">Locker-to-locker/kiosk courier rate quotes, booking, and tracking for "shipping" sales.</span>
+        <span class="integration-env">PUDO_API_KEY</span>
+        <a class="integration-link" href="https://customer.tcglocker.co.za/" target="_blank" rel="noopener">Open Dashboard →</a>
       </div>
     </div>
 
