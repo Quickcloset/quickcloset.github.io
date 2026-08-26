@@ -539,7 +539,9 @@
     </div>
     <p class="income-note">
       Transaction fee income is real, from <code>orders.platform_fee</code> — it reads R0 because the fee has been
-      set to 0% this whole time, not because tracking is broken. Subscription income isn't shown: no recurring
+      set to 0% this whole time, not because tracking is broken. Courier revenue is the R10 QuickCloset adds on top
+      of PUDO's raw quoted rate on every shipped order, from <code>orders.courier_markup</code> — this one is real
+      and non-zero as soon as a real PUDO order ships. Subscription income isn't shown: no recurring
       billing exists in the app yet, so there's nothing real to report there.
     </p>
     <div class="total-income-banner" id="total-income-banner"></div>
@@ -1387,6 +1389,7 @@
       ['gross_sales', 'Gross Sales (ZAR)'],
       ['avg_sale_price', 'Avg Sale Price (ZAR)', function (r) { var c = Number(r.orders_count); return c > 0 ? (Number(r.gross_sales) / c).toFixed(2) : ''; }],
       ['transaction_fee_income', 'Transaction Fee Income (ZAR)'],
+      ['courier_revenue_income', 'Courier Revenue Income (ZAR)'],
     ], incomeRows);
   }
 
@@ -1600,11 +1603,13 @@
   function renderTotalIncomeBanner(incomeRows, expenseRows) {
     var t = incomeRows[0];
     var totalExpenses = Number((expenseRows && expenseRows[0] && expenseRows[0].total_expenses) || 0);
-    var net = Number(t.total_transaction_fee_income) - totalExpenses;
+    var totalCourierRevenue = Number(t.total_courier_revenue_income || 0);
+    var totalIncome = Number(t.total_transaction_fee_income) + totalCourierRevenue;
+    var net = totalIncome - totalExpenses;
     document.getElementById('total-income-banner').innerHTML =
       '<div class="tib-item"><span class="tib-label">Total QuickCloset Income (All-Time)</span>' +
-        '<span class="tib-value">' + formatRand(t.total_transaction_fee_income) + '</span>' +
-        '<span class="tib-sub">Every income source that currently exists — transaction fees only, since subscriptions aren\'t built. Not affected by the date range above.</span>' +
+        '<span class="tib-value">' + formatRand(totalIncome) + '</span>' +
+        '<span class="tib-sub">Transaction fees (' + formatRand(t.total_transaction_fee_income) + ') + courier revenue (' + formatRand(totalCourierRevenue) + ', the R10 margin added to each PUDO booking). No subscription income — not built. Not affected by the date range above.</span>' +
       '</div>' +
       '<div class="tib-item"><span class="tib-label">Total Expenses (All-Time)</span>' +
         '<span class="tib-value">' + formatRand(totalExpenses) + '</span>' +
@@ -1627,13 +1632,14 @@
       wrap.innerHTML = '<div class="empty-state">No paid orders in this range.</div>';
       return;
     }
-    var totalOrders = 0, totalGross = 0, totalFees = 0;
+    var totalOrders = 0, totalGross = 0, totalFees = 0, totalCourierRevenue = 0;
     var body = rows.map(function (r) {
       var count = Number(r.orders_count);
       var gross = Number(r.gross_sales);
       totalOrders += count;
       totalGross += gross;
       totalFees += Number(r.transaction_fee_income);
+      totalCourierRevenue += Number(r.courier_revenue_income);
       var avg = count > 0 ? gross / count : null;
       var d = new Date(r.month + 'T00:00:00Z');
       var label = d.toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
@@ -1643,6 +1649,7 @@
         '<td class="num">' + formatRand(r.gross_sales) + '</td>' +
         '<td class="num ' + (avg == null ? 'muted' : '') + '">' + (avg == null ? '—' : formatRand(avg)) + '</td>' +
         '<td class="num">' + formatRand(r.transaction_fee_income) + '</td>' +
+        '<td class="num">' + formatRand(r.courier_revenue_income) + '</td>' +
         '</tr>';
     }).join('');
     var totalAvg = totalOrders > 0 ? totalGross / totalOrders : null;
@@ -1652,8 +1659,9 @@
       '<td class="num">' + formatRand(totalGross) + '</td>' +
       '<td class="num">' + (totalAvg == null ? '—' : formatRand(totalAvg)) + '</td>' +
       '<td class="num">' + formatRand(totalFees) + '</td>' +
+      '<td class="num">' + formatRand(totalCourierRevenue) + '</td>' +
       '</tr>';
-    wrap.innerHTML = '<table><thead><tr><th>Month</th><th>Orders</th><th>Gross Sales</th><th>Avg Sale Price</th><th>Fee Income</th></tr></thead><tbody>' +
+    wrap.innerHTML = '<table><thead><tr><th>Month</th><th>Orders</th><th>Gross Sales</th><th>Avg Sale Price</th><th>Fee Income</th><th>Courier Revenue</th></tr></thead><tbody>' +
       body + foot + '</tbody></table>';
   }
 
