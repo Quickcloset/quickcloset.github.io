@@ -178,7 +178,9 @@
   .tib-item { display: flex; flex-direction: column; gap: 4px; }
   .tib-label { font-size: 11px; font-weight: 700; color: var(--sage-deep); letter-spacing: 0.06em; text-transform: uppercase; }
   .tib-value { font-family: 'Fraunces', serif; font-weight: 700; font-size: 26px; color: var(--text); }
+  .tib-value.tib-muted { color: var(--text-3); }
   .tib-sub { font-size: 11.5px; color: var(--text-3); max-width: 320px; }
+  .tib-sub code { background: var(--surface-alt); padding: 1px 5px; border-radius: 4px; font-size: 10.5px; }
 
   /* ── Status pills (semantic — separate from the sage brand accent) ── */
   .pill {
@@ -1603,13 +1605,27 @@
   function renderTotalIncomeBanner(incomeRows, expenseRows) {
     var t = incomeRows[0];
     var totalExpenses = Number((expenseRows && expenseRows[0] && expenseRows[0].total_expenses) || 0);
-    var totalCourierRevenue = Number(t.total_courier_revenue_income || 0);
-    var totalIncome = Number(t.total_transaction_fee_income) + totalCourierRevenue;
+    var totalSubscription = 0;
+    var totalTransactional = Number(t.total_transaction_fee_income || 0);
+    var totalCourier = Number(t.total_courier_revenue_income || 0);
+    var totalIncome = totalSubscription + totalTransactional + totalCourier;
     var net = totalIncome - totalExpenses;
     document.getElementById('total-income-banner').innerHTML =
+      '<div class="tib-item"><span class="tib-label">Subscription Income (All-Time)</span>' +
+        '<span class="tib-value tib-muted">' + formatRand(totalSubscription) + '</span>' +
+        '<span class="tib-sub">No recurring billing exists in the app yet — always R0 until that feature is built, not a tracking gap.</span>' +
+      '</div>' +
+      '<div class="tib-item"><span class="tib-label">Transactional Income (All-Time)</span>' +
+        '<span class="tib-value">' + formatRand(totalTransactional) + '</span>' +
+        '<span class="tib-sub">Platform fee on marketplace sales (<code>orders.platform_fee</code>) — currently set to 0%, so reads R0 until that\'s turned on.</span>' +
+      '</div>' +
+      '<div class="tib-item"><span class="tib-label">Courier Income (All-Time)</span>' +
+        '<span class="tib-value">' + formatRand(totalCourier) + '</span>' +
+        '<span class="tib-sub">R10 margin QuickCloset adds on top of PUDO\'s real quoted rate on every shipped order (<code>orders.courier_markup</code>).</span>' +
+      '</div>' +
       '<div class="tib-item"><span class="tib-label">Total QuickCloset Income (All-Time)</span>' +
         '<span class="tib-value">' + formatRand(totalIncome) + '</span>' +
-        '<span class="tib-sub">Transaction fees (' + formatRand(t.total_transaction_fee_income) + ') + courier revenue (' + formatRand(totalCourierRevenue) + ', the R10 margin added to each PUDO booking). No subscription income — not built. Not affected by the date range above.</span>' +
+        '<span class="tib-sub">Subscription + transactional + courier — every real income source combined. Not affected by the date range above.</span>' +
       '</div>' +
       '<div class="tib-item"><span class="tib-label">Total Expenses (All-Time)</span>' +
         '<span class="tib-value">' + formatRand(totalExpenses) + '</span>' +
@@ -1620,7 +1636,7 @@
         '<span class="tib-sub">Income minus expenses — the actual bottom line for SARS/accounting purposes.</span>' +
       '</div>' +
       '<div class="tib-item"><span class="tib-label">Lifetime Gross Sales</span>' +
-        '<span class="tib-value">' + formatRand(t.total_gross_sales) + '</span>' +
+        '<span class="tib-value tib-muted">' + formatRand(t.total_gross_sales) + '</span>' +
         '<span class="tib-sub">' + t.total_orders + ' paid order' + (t.total_orders !== 1 ? 's' : '') + ' — this is buyer/seller money passing through, not QuickCloset\'s income.</span>' +
       '</div>';
   }
