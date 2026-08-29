@@ -498,7 +498,7 @@
       <span>Ratings <span style="font-weight:500;color:var(--text-3);">— seller ratings left by buyers, all-time</span></span>
       <button class="csv-btn" onclick="exportRatingsCSV()">Export CSV</button>
     </div>
-    <p class="income-note" style="margin-bottom:0;">You get an email alert for any 1-2 star rating or any rating with a comment — a plain 5-star stays quiet. Hiding a rating removes it from the seller's public average immediately; it's reversible.</p>
+    <p class="income-note" style="margin-bottom:0;">Every 1-2 star or commented rating from the last 24h is batched into one daily digest email (not an instant alert per rating — that would flood the inbox at real volume) — needs a daily schedule registered for <code>admin-daily-digest</code> in Supabase Dashboard &gt; Edge Functions &gt; Cron, same as archive-old-listings. Hiding a rating removes it from the seller's public average immediately; it's reversible.</p>
     <div class="table-wrap" id="ratings-table-wrap"></div>
 
     <div class="section-title" style="margin-top:32px;">
