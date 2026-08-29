@@ -491,19 +491,21 @@
       <span>Reports <span style="font-weight:500;color:var(--text-3);">— safety reports filed before purchase (scams, inappropriate content, harassment), all-time</span></span>
       <button class="csv-btn" onclick="exportReportsCSV()">Export CSV</button>
     </div>
-    <p class="income-note" style="margin-bottom:0;">A report never hides a listing by itself — review it below and choose to dismiss it or remove the listing. The seller is only notified if you remove the listing.</p>
+    <p class="income-note" style="margin-bottom:0;">A report never hides a listing by itself — review it below and choose to dismiss it or remove the listing. The seller is only notified if you remove the listing. You also get an email alert the moment a report is filed, so you don't have to keep checking here.</p>
     <div class="table-wrap" id="reports-table-wrap"></div>
 
     <div class="section-title" style="margin-top:32px;">
       <span>Disputes <span style="font-weight:500;color:var(--text-3);">— all-time, not affected by the date range</span></span>
       <button class="csv-btn" onclick="exportDisputesCSV()">Export CSV</button>
     </div>
+    <p class="income-note" style="margin-bottom:0;">You get an email alert the moment a buyer files a dispute — the buyer/seller resolve it between themselves in-app (accept/refund or reject), this table is for visibility, not action.</p>
     <div class="table-wrap" id="disputes-table-wrap"></div>
 
     <div class="section-title" style="margin-top:32px;">
       <span>Payouts <span style="font-weight:500;color:var(--text-3);">— seller cash-outs to their bank account, all-time</span></span>
       <button class="csv-btn" onclick="exportPayoutsCSV()">Export CSV</button>
     </div>
+    <p class="income-note" style="margin-bottom:0;">A failed or cancelled payout emails an alert immediately — the seller's money is still safe in their wallet, but it's worth checking why the bank transfer didn't go through.</p>
     <div class="table-wrap" id="payouts-table-wrap"></div>
   </div>
 
@@ -528,7 +530,7 @@
         <span class="site-status-label">PUDO courier booking</span>
         <button class="expense-btn" id="courier-toggle-btn" style="margin-left:auto;" onclick="toggleCourierEnabled()">…</button>
       </div>
-      <p class="income-note" style="margin-bottom:0;">When disabled, sold "shipping" orders skip real courier booking and stay pending for manual arrangement — nothing about the sale itself is affected.</p>
+      <p class="income-note" style="margin-bottom:0;">When disabled, sold "shipping" orders skip real courier booking and stay pending for manual arrangement — nothing about the sale itself is affected. A failed courier booking also emails an alert immediately, since the buyer's already paid and the item needs shipping arranged by hand.</p>
     </div>
 
     <div class="section-title">Shipment status breakdown <span style="font-weight:500;color:var(--text-3);">— all-time</span></div>
