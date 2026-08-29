@@ -488,6 +488,13 @@
     <div class="table-wrap" id="orders-table-wrap"></div>
 
     <div class="section-title" style="margin-top:32px;">
+      <span>Reports <span style="font-weight:500;color:var(--text-3);">— safety reports filed before purchase (scams, inappropriate content, harassment), all-time</span></span>
+      <button class="csv-btn" onclick="exportReportsCSV()">Export CSV</button>
+    </div>
+    <p class="income-note" style="margin-bottom:0;">A report never hides a listing by itself — review it below and choose to dismiss it or remove the listing. The seller is only notified if you remove the listing.</p>
+    <div class="table-wrap" id="reports-table-wrap"></div>
+
+    <div class="section-title" style="margin-top:32px;">
       <span>Disputes <span style="font-weight:500;color:var(--text-3);">— all-time, not affected by the date range</span></span>
       <button class="csv-btn" onclick="exportDisputesCSV()">Export CSV</button>
     </div>
@@ -792,6 +799,7 @@
   var waitlistRows = [];
   var ordersRows = [];
   var disputesRows = [];
+  var reportsRows = [];
   var payoutsRows = [];
   var expensesRows = [];
   var editingExpenseId = null;
@@ -1255,6 +1263,7 @@
             .then(function (r) { renderTotalIncomeBanner(r[0], r[1]); }),
           rpc('admin_get_waitlist').then(renderWaitlistTable),
           rpc('admin_get_retention').then(renderRetentionTable),
+          rpc('admin_get_content_reports').then(renderReportsTable),
           rpc('admin_get_disputes').then(renderDisputesTable),
           rpc('admin_get_payouts').then(renderPayoutsTable),
           rpc('admin_get_shipments').then(renderShipmentsTable),
@@ -1305,8 +1314,8 @@
 
   // Maps a raw enum/status string to a semantic pill class — shared by the
   // Orders, Disputes, Payouts tables and the user drill-down modal.
-  var PILL_GOOD = ['paid', 'paid_out', 'success', 'delivered', 'accepted', 'sold', 'active', 'collected', 'sent'];
-  var PILL_BAD = ['failed', 'cancelled', 'rejected', 'reversed'];
+  var PILL_GOOD = ['paid', 'paid_out', 'success', 'delivered', 'accepted', 'sold', 'active', 'collected', 'sent', 'dismissed'];
+  var PILL_BAD = ['failed', 'cancelled', 'rejected', 'reversed', 'upheld', 'removed'];
   function pillHtml(status) {
     if (status == null) return '<span class="pill">—</span>';
     var s = String(status);
@@ -1812,6 +1821,63 @@
     }).join('');
     wrap.innerHTML = '<table><thead><tr><th>Buyer</th><th>Seller</th><th>Amount</th><th>Fulfillment</th><th>Status</th><th>Shipment</th><th>Created</th><th>Paid</th></tr></thead><tbody>' +
       body + '</tbody></table>';
+  }
+
+  var REPORT_REASON_LABELS = {
+    scam_or_fraud: 'Scam or fraud',
+    inappropriate_content: 'Inappropriate content',
+    harassment: 'Harassment',
+    counterfeit: 'Counterfeit item',
+    other: 'Other',
+  };
+
+  function renderReportsTable(rows) {
+    reportsRows = rows || [];
+    var wrap = document.getElementById('reports-table-wrap');
+    if (!rows || rows.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">No reports have ever been filed.</div>';
+      return;
+    }
+    var body = rows.map(function (r) {
+      var actions = r.status === 'open'
+        ? '<button class="expense-btn" onclick="resolveReport(\'' + r.id + '\',\'dismiss\')">Dismiss</button> ' +
+          '<button class="expense-btn warn" onclick="resolveReport(\'' + r.id + '\',\'remove_listing\')">Remove Listing</button>'
+        : (r.admin_note ? escapeHtml(r.admin_note) : '—');
+      return '<tr>' +
+        '<td>' + escapeHtml(r.listing_title) + ' <span class="pill" style="margin-left:4px;">' + escapeHtml(r.listing_status) + '</span></td>' +
+        '<td>' + escapeHtml(r.seller_username) + '</td>' +
+        '<td>' + escapeHtml(r.reporter_username) + '</td>' +
+        '<td>' + escapeHtml(REPORT_REASON_LABELS[r.reason] || r.reason) + '</td>' +
+        '<td class="' + (r.details ? '' : 'muted') + '">' + (r.details ? escapeHtml(r.details) : '—') + '</td>' +
+        '<td>' + pillHtml(r.status) + '</td>' +
+        '<td class="num">' + fmtDate(r.created_at) + '</td>' +
+        '<td>' + actions + '</td>' +
+        '</tr>';
+    }).join('');
+    wrap.innerHTML = '<table><thead><tr><th>Listing</th><th>Seller</th><th>Reporter</th><th>Reason</th><th>Details</th><th>Status</th><th>Filed</th><th>Action</th></tr></thead><tbody>' +
+      body + '</tbody></table>';
+  }
+
+  function resolveReport(reportId, action) {
+    if (action === 'remove_listing' && !confirm('Remove this listing? The seller will be notified.')) return;
+    rpc('admin_resolve_content_report', { report_id_input: reportId, action_input: action })
+      .then(function () { return rpc('admin_get_content_reports'); })
+      .then(renderReportsTable)
+      .catch(function (e) { alert(e.message || 'Could not resolve report'); });
+  }
+
+  function exportReportsCSV() {
+    downloadCSV('quickcloset-reports.csv', [
+      ['listing_title', 'Listing'],
+      ['seller_username', 'Seller'],
+      ['reporter_username', 'Reporter'],
+      ['reason', 'Reason'],
+      ['details', 'Details'],
+      ['status', 'Status'],
+      ['admin_note', 'Admin Note'],
+      ['created_at', 'Filed', function (r) { return fmtDate(r.created_at); }],
+      ['resolved_at', 'Resolved', function (r) { return fmtDate(r.resolved_at); }],
+    ], reportsRows);
   }
 
   function renderDisputesTable(rows) {
