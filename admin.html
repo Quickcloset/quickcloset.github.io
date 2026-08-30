@@ -780,14 +780,12 @@
     </div>
 
     <div class="integration-group-title">Reliability &amp; Monitoring</div>
-    <div class="integration-grid">
-      <div class="integration-card">
-        <span class="integration-name">Sentry</span>
-        <span class="integration-desc">Client-side crash/error reporting for the app — catches JS errors, unhandled promise rejections, and render crashes on a user's phone and reports them here, instead of relying on the user to report it themselves. Not fully set up yet: needs a real DSN.</span>
-        <span class="integration-env">EXPO_PUBLIC_SENTRY_DSN</span>
-        <a class="integration-link" href="https://sentry.io/" target="_blank" rel="noopener">Open Dashboard →</a>
-      </div>
+    <p class="income-note" style="margin-bottom:12px;">Client-side crash/error reporting, built in-house on Supabase (no external vendor — a third-party option was tried and turned out to be trial-gated, not genuinely free). Catches JS errors, unhandled promise rejections, and render crashes on a user's phone. You also get one daily digest email summarizing unreviewed errors, grouped by message so a repeating bug doesn't mean dozens of emails.</p>
+    <div class="section-title" style="margin-top:0;">
+      <span>Client Errors <span style="font-weight:500;color:var(--text-3);">— most recent 500, all-time</span></span>
+      <button class="csv-btn" onclick="exportErrorsCSV()">Export CSV</button>
     </div>
+    <div class="table-wrap" id="errors-table-wrap"></div>
 
     <div class="integration-group-title">App Distribution</div>
     <div class="integration-grid">
@@ -820,6 +818,7 @@
   var disputesRows = [];
   var reportsRows = [];
   var ratingsRows = [];
+  var errorsRows = [];
   var payoutsRows = [];
   var expensesRows = [];
   var editingExpenseId = null;
@@ -1285,6 +1284,7 @@
           rpc('admin_get_retention').then(renderRetentionTable),
           rpc('admin_get_content_reports').then(renderReportsTable),
           rpc('admin_get_seller_ratings').then(renderRatingsTable),
+          rpc('admin_get_client_errors').then(renderErrorsTable),
           rpc('admin_get_disputes').then(renderDisputesTable),
           rpc('admin_get_payouts').then(renderPayoutsTable),
           rpc('admin_get_shipments').then(renderShipmentsTable),
@@ -1335,7 +1335,7 @@
 
   // Maps a raw enum/status string to a semantic pill class — shared by the
   // Orders, Disputes, Payouts tables and the user drill-down modal.
-  var PILL_GOOD = ['paid', 'paid_out', 'success', 'delivered', 'accepted', 'sold', 'active', 'collected', 'sent', 'dismissed', 'visible'];
+  var PILL_GOOD = ['paid', 'paid_out', 'success', 'delivered', 'accepted', 'sold', 'active', 'collected', 'sent', 'dismissed', 'visible', 'reviewed'];
   var PILL_BAD = ['failed', 'cancelled', 'rejected', 'reversed', 'upheld', 'removed', 'hidden'];
   function pillHtml(status) {
     if (status == null) return '<span class="pill">—</span>';
@@ -1948,6 +1948,50 @@
       ['hidden_reason', 'Hidden Reason'],
       ['created_at', 'Left', function (r) { return fmtDate(r.created_at); }],
     ], ratingsRows);
+  }
+
+  function renderErrorsTable(rows) {
+    errorsRows = rows || [];
+    var wrap = document.getElementById('errors-table-wrap');
+    if (!rows || rows.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">No client errors have ever been logged.</div>';
+      return;
+    }
+    var body = rows.map(function (r) {
+      var actions = r.reviewed_at
+        ? '<button class="expense-btn" onclick="resolveError(\'' + r.id + '\',false)">Unmark</button>'
+        : '<button class="expense-btn warn" onclick="resolveError(\'' + r.id + '\',true)">Mark Reviewed</button>';
+      return '<tr>' +
+        '<td>' + (r.is_fatal ? '💥 ' : '') + escapeHtml(r.message) + '</td>' +
+        '<td>' + escapeHtml(r.username || '(not logged in)') + '</td>' +
+        '<td>' + escapeHtml(r.platform || '—') + '</td>' +
+        '<td>' + escapeHtml(r.app_version || '—') + '</td>' +
+        '<td>' + (r.reviewed_at ? pillHtml('reviewed') : pillHtml('pending')) + '</td>' +
+        '<td class="num">' + fmtDate(r.created_at) + '</td>' +
+        '<td>' + actions + '</td>' +
+        '</tr>';
+    }).join('');
+    wrap.innerHTML = '<table><thead><tr><th>Message</th><th>User</th><th>Platform</th><th>App Version</th><th>Status</th><th>Occurred</th><th>Action</th></tr></thead><tbody>' +
+      body + '</tbody></table>';
+  }
+
+  function resolveError(errorId, reviewed) {
+    rpc('admin_mark_client_error_reviewed', { error_id_input: errorId, reviewed_input: reviewed })
+      .then(function () { return rpc('admin_get_client_errors'); })
+      .then(renderErrorsTable)
+      .catch(function (e) { alert(e.message || 'Could not update error'); });
+  }
+
+  function exportErrorsCSV() {
+    downloadCSV('quickcloset-client-errors.csv', [
+      ['message', 'Message'],
+      ['username', 'User'],
+      ['platform', 'Platform'],
+      ['app_version', 'App Version'],
+      ['is_fatal', 'Fatal', function (r) { return r.is_fatal ? 'Yes' : 'No'; }],
+      ['reviewed_at', 'Status', function (r) { return r.reviewed_at ? 'Reviewed' : 'Pending'; }],
+      ['created_at', 'Occurred', function (r) { return fmtDate(r.created_at); }],
+    ], errorsRows);
   }
 
   function renderDisputesTable(rows) {
