@@ -503,7 +503,7 @@
       <span>Reports <span style="font-weight:500;color:var(--text-3);">— safety reports filed before purchase (scams, inappropriate content, harassment), all-time</span></span>
       <button class="csv-btn" onclick="exportReportsCSV()">Export CSV</button>
     </div>
-    <p class="income-note" style="margin-bottom:0;">A report never hides a listing by itself — review it below and choose to dismiss it or remove the listing. The seller is only notified if you remove the listing. You also get an email alert the moment a report is filed, so you don't have to keep checking here.</p>
+    <p class="income-note" style="margin-bottom:0;">A human-filed report never hides a listing by itself — review it and choose to dismiss it or remove the listing, and the seller is only notified if you remove it. You get an instant email alert the moment a human files one. An AI-flagged listing (🤖, added 2026-08-30) works the other way round: it's already held back from going live at upload time, so the choice here is Approve (publish it) or Remove — there's nothing to "dismiss" since it was never live to begin with. AI-flags do NOT trigger an instant email (every listing gets auto-screened, so a trigger-happy check could mean a lot of them — check this table periodically instead).</p>
     <div class="table-wrap" id="reports-table-wrap"></div>
 
     <div class="section-title" style="margin-top:32px;">
@@ -1903,6 +1903,7 @@
     harassment: 'Harassment',
     counterfeit: 'Counterfeit item',
     other: 'Other',
+    ai_flagged: '🤖 AI-flagged at upload',
   };
 
   function renderReportsTable(rows) {
@@ -1913,14 +1914,21 @@
       return;
     }
     var body = rows.map(function (r) {
-      var actions = r.status === 'open'
-        ? '<button class="expense-btn" onclick="resolveReport(\'' + r.id + '\',\'dismiss\')">Dismiss</button> ' +
+      // A listing an AI held at 'under_review' was never live — "Dismiss"
+      // alone would leave it stuck there forever, so that case gets
+      // "Approve" (publish it) instead, not "Dismiss". A normal human
+      // report against an already-active listing keeps Dismiss/Remove.
+      var actions = r.status !== 'open'
+        ? (r.admin_note ? escapeHtml(r.admin_note) : '—')
+        : r.listing_status === 'under_review'
+        ? '<button class="expense-btn" onclick="resolveReport(\'' + r.id + '\',\'approve_listing\')">Approve</button> ' +
           '<button class="expense-btn warn" onclick="resolveReport(\'' + r.id + '\',\'remove_listing\')">Remove Listing</button>'
-        : (r.admin_note ? escapeHtml(r.admin_note) : '—');
+        : '<button class="expense-btn" onclick="resolveReport(\'' + r.id + '\',\'dismiss\')">Dismiss</button> ' +
+          '<button class="expense-btn warn" onclick="resolveReport(\'' + r.id + '\',\'remove_listing\')">Remove Listing</button>';
       return '<tr>' +
         '<td>' + escapeHtml(r.listing_title) + ' <span class="pill" style="margin-left:4px;">' + escapeHtml(r.listing_status) + '</span></td>' +
         '<td>' + escapeHtml(r.seller_username) + '</td>' +
-        '<td>' + escapeHtml(r.reporter_username) + '</td>' +
+        '<td class="' + (r.reporter_username ? '' : 'muted') + '">' + (r.reporter_username ? escapeHtml(r.reporter_username) : 'System (AI)') + '</td>' +
         '<td>' + escapeHtml(REPORT_REASON_LABELS[r.reason] || r.reason) + '</td>' +
         '<td class="' + (r.details ? '' : 'muted') + '">' + (r.details ? escapeHtml(r.details) : '—') + '</td>' +
         '<td>' + pillHtml(r.status) + '</td>' +
