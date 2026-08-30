@@ -22,3 +22,9 @@ The site supports light and dark rendering via CSS custom properties defined in 
 - Adding a real external vendor → add a card to the relevant group (`Backend & Infrastructure`, `Payments & Fulfillment`, `Communications`, `AI & Data`, `App Distribution`, or a new group if none fit) with its name, what it's for, the env var/secret it needs, and a dashboard link.
 - Removing a vendor → delete its card entirely, don't leave a stale "not set up" placeholder pointing at something no longer used.
 - If the thing being added is an in-house feature built on infrastructure already listed here (e.g. client-error logging built on Supabase, not a new vendor), it doesn't get its own vendor card — but if it has a real admin-facing data view, add that as a live section instead (see "Client Errors" for the pattern: `section-title` + CSV export button + `table-wrap`).
+
+## Anonymous inserts (waitlist, page views, etc.) — always `Prefer: return=minimal`
+
+Both `waitlist_signups` and `page_views` are insert-only tables with `with check (true)` RLS and deliberately **no SELECT policy** — an anonymous row has no owning user to self-select against. Requesting the row back after insert (`Prefer: return=representation`, or omitting `Prefer` entirely — the default) forces PostgREST to do an implicit `RETURNING`, which needs a SELECT policy to satisfy; with none, it throws a `42501` RLS-violation error that looks exactly like a broken INSERT policy but isn't one. Confirmed by testing: the identical insert with `Prefer: return=minimal` succeeds (`201`).
+
+**Rule**: any fetch that inserts into an anonymous/ownerless table in this repo must send `'Prefer': 'return=minimal'` and never chain a way to read the row back. Both existing call sites (`waitlist_signups`, `page_views` in `index.html`) already do this correctly — copy their pattern exactly for any new anonymous-insert table, don't reinvent it.
