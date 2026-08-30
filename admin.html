@@ -478,6 +478,18 @@
       <span>Retention <span style="font-weight:500;color:var(--text-3);">— % of each signup cohort active in the last 7 days</span></span>
     </div>
     <div class="table-wrap snug" id="retention-table-wrap"></div>
+
+    <div class="section-title" style="margin-top:32px;">
+      <span>Cataloging Funnel <span style="font-weight:500;color:var(--text-3);">— all-time, measured against each user's own signup date, not a fixed calendar date</span></span>
+    </div>
+    <p class="income-note" style="margin-bottom:12px;">Answers "does cold-start cataloging actually work" — of everyone who's ever signed up, what share reached each milestone within a fixed window of joining.</p>
+    <div class="stat-row" id="funnel-stat-row"></div>
+
+    <div class="section-title" style="margin-top:32px;">
+      <span>Nudge Open Rate <span style="font-weight:500;color:var(--text-3);">— for the date range in the Overview tab</span></span>
+    </div>
+    <p class="income-note" style="margin-bottom:12px;">"Sent" was always visible per-run in the cron logs — this is whether anyone actually taps them, tracked via a real notification-tap listener, not just "seen in the in-app list."</p>
+    <div class="table-wrap snug" id="nudge-stats-table-wrap"></div>
   </div>
 
   <div class="tab-panel" id="tab-marketplace">
@@ -830,12 +842,18 @@
   // start date to generate buckets from.
   var ALL_TIME_START = '2026-01-01T00:00:00.000Z';
 
-  // Validated categorical slots (dataviz skill default theme, first 3 —
-  // these clear every adjacent + all-pairs CVD/contrast gate in both modes).
+  // Validated categorical slots (dataviz skill default theme). This is a
+  // line chart, which only needs the ADJACENT pairlist to clear (not the
+  // stricter all-pairs one scatter/small-multiples need) — re-validated
+  // with all 4 slots via scripts/validate_palette.js on 2026-08-30 when
+  // dau was added: all checks pass both modes (light mode has a contrast
+  // WARN on slots 3/4 vs the surface, satisfied by the visible legend
+  // labels below, not color alone — the "relief rule").
   var SERIES = [
     { key: 'signups', label: 'Signups', light: '#2a78d6', dark: '#3987e5' },
     { key: 'stylist_uses', label: 'Stylist Uses', light: '#eb6834', dark: '#d95926' },
     { key: 'find_in_closet_uses', label: 'Find in Closet Uses', light: '#1baf7a', dark: '#199e70' },
+    { key: 'dau', label: 'Daily Active Users', light: '#eda100', dark: '#c98500' },
   ];
 
   var RECOVERY_TOKENS = parseRecoveryHash();
@@ -1282,6 +1300,7 @@
             .then(function (r) { renderTotalIncomeBanner(r[0], r[1]); }),
           rpc('admin_get_waitlist').then(renderWaitlistTable),
           rpc('admin_get_retention').then(renderRetentionTable),
+          rpc('admin_get_cataloging_funnel').then(function (rows) { renderFunnelStats(rows && rows[0]); }),
           rpc('admin_get_content_reports').then(renderReportsTable),
           rpc('admin_get_seller_ratings').then(renderRatingsTable),
           rpc('admin_get_client_errors').then(renderErrorsTable),
@@ -1318,6 +1337,7 @@
       rpc('admin_get_traffic_timeseries', { from_date: bounds.from, to_date: bounds.to }),
       rpc('admin_get_traffic_top_paths', { from_date: bounds.from, to_date: bounds.to }),
       rpc('admin_get_traffic_top_referrers', { from_date: bounds.from, to_date: bounds.to }),
+      rpc('admin_get_nudge_stats', { from_date: bounds.from, to_date: bounds.to }).then(renderNudgeStatsTable),
     ]).then(function (results) {
       renderStats(results[0][0]);
       renderChart(results[1]);
@@ -1494,6 +1514,39 @@
       return '<tr><td>' + label + '</td><td class="num">' + r.cohort_size + '</td><td class="num">' + r.retention_pct + '%</td></tr>';
     }).join('');
     wrap.innerHTML = '<table><thead><tr><th>Signed up</th><th>Cohort size</th><th>Active in last 7d</th></tr></thead><tbody>' + body + '</tbody></table>';
+  }
+
+  function renderFunnelStats(o) {
+    if (!o) o = {};
+    var total = Number(o.total_signups || 0);
+    function pct(n) { return total > 0 ? Math.round((Number(n || 0) / total) * 100) + '%' : '—'; }
+    var tiles = [
+      ['Total Signups', total],
+      ['1+ item in 24h', pct(o.reached_1_item_in_24h)],
+      ['3+ items in 3 days', pct(o.reached_3_items_in_3d)],
+      ['5+ items in 7 days', pct(o.reached_5_items_in_7d)],
+    ];
+    document.getElementById('funnel-stat-row').innerHTML = tiles.map(function (t) {
+      return '<div class="stat-tile"><span class="stat-label">' + t[0] + '</span><span class="stat-value num">' + t[1] + '</span></div>';
+    }).join('');
+  }
+
+  var NUDGE_TYPE_LABELS = { daily_style_nudge: 'Style nudge (weather-aware)', reengagement_nudge: 'Re-engagement nudge' };
+
+  function renderNudgeStatsTable(rows) {
+    var wrap = document.getElementById('nudge-stats-table-wrap');
+    if (!rows || rows.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">No nudges sent in this range.</div>';
+      return;
+    }
+    var body = rows.map(function (r) {
+      var sent = Number(r.sent || 0);
+      var opened = Number(r.opened || 0);
+      var rate = sent > 0 ? Math.round((opened / sent) * 100) + '%' : '—';
+      return '<tr><td>' + (NUDGE_TYPE_LABELS[r.type] || escapeHtml(r.type)) + '</td>' +
+        '<td class="num">' + sent + '</td><td class="num">' + opened + '</td><td class="num">' + rate + '</td></tr>';
+    }).join('');
+    wrap.innerHTML = '<table><thead><tr><th>Nudge type</th><th>Sent</th><th>Opened</th><th>Open rate</th></tr></thead><tbody>' + body + '</tbody></table>';
   }
 
   var selectedWaitlistEmails = {};
