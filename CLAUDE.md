@@ -13,3 +13,12 @@ The site supports light and dark rendering via CSS custom properties defined in 
 2. If a section is deliberately single-treatment (a fixed dark photo backdrop, for example) and must look the same regardless of site theme, its text/border colors need a **fixed, non-flipping variable** (like `--on-dark`), not a theme-reactive one repurposed for a different job.
 3. Actually render the change in dark mode before calling it done — toggle the OS/browser dark mode (or Chrome DevTools' Rendering tab → "Emulate CSS media feature prefers-color-scheme") and eyeball contrast on every section touched. A `tsc`/lint pass or "it renders" is not the same as "it's legible in both themes."
 4. This applies to `index.html` and `admin.html` both — `admin.html` uses the same variable system.
+
+## Integrations page — keep it in sync automatically, don't wait to be asked
+
+`admin.html`'s Integrations tab is meant to be "every external system QuickCloset depends on to run, in one place." That's only true if it's updated the moment reality changes, not on request.
+
+**Rule (added 2026-08-30, explicit user instruction):** whenever an integration/vendor is added to or removed from the codebase (a new third-party API key, SDK, or service; or one being ripped out — e.g. Sentry was added then removed the same day after its free tier turned out to be trial-gated), update this Integrations tab in the *same* piece of work, automatically — do not wait for the user to ask. Concretely:
+- Adding a real external vendor → add a card to the relevant group (`Backend & Infrastructure`, `Payments & Fulfillment`, `Communications`, `AI & Data`, `App Distribution`, or a new group if none fit) with its name, what it's for, the env var/secret it needs, and a dashboard link.
+- Removing a vendor → delete its card entirely, don't leave a stale "not set up" placeholder pointing at something no longer used.
+- If the thing being added is an in-house feature built on infrastructure already listed here (e.g. client-error logging built on Supabase, not a new vendor), it doesn't get its own vendor card — but if it has a real admin-facing data view, add that as a live section instead (see "Client Errors" for the pattern: `section-title` + CSV export button + `table-wrap`).
