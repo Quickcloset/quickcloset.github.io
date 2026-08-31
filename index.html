@@ -147,6 +147,11 @@
     font-size: 13px; font-weight: 700; color: var(--surface); background: var(--sage);
     padding: 10px 20px; border-radius: 999px; text-decoration: none; white-space: nowrap;
   }
+  .nav-actions { display: flex; align-items: center; gap: 18px; }
+  .nav-blog-link {
+    font-size: 13px; font-weight: 700; color: var(--text-2); text-decoration: none; white-space: nowrap;
+  }
+  .nav-blog-link:hover { color: var(--sage-deep); }
 
   /* ── Hero ── */
   .hero {
@@ -385,7 +390,10 @@
       </span>
       QuickCloset
     </div>
-    <a class="nav-cta" href="#download">Get Notified</a>
+    <div class="nav-actions">
+      <a class="nav-blog-link" href="/blog/">Blog</a>
+      <a class="nav-cta" href="#download">Get Notified</a>
+    </div>
   </div>
 </nav>
 
