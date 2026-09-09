@@ -539,6 +539,15 @@
       <p class="income-note" style="margin-bottom:0;">When disabled, new checkouts are blocked with a clear message. Orders already in progress are unaffected.</p>
     </div>
 
+    <div class="site-status-card">
+      <div class="site-status-row">
+        <span class="pill" id="test-mode-status-pill">Loading…</span>
+        <span class="site-status-label">Test mode</span>
+        <button class="expense-btn" id="test-mode-toggle-btn" style="margin-left:auto;" onclick="toggleTestMode()">…</button>
+      </div>
+      <p class="income-note" style="margin-bottom:0;">While on, every new order is tagged as a test transaction — still fully visible in the Orders table below (see the Type column), just excluded from Lifetime Gross Sales, the Income Report, and Fee Income. Turn this off once real beta/launch traffic begins.</p>
+    </div>
+
     <div class="section-title">Order status breakdown <span style="font-weight:500;color:var(--text-3);">— selected date range, from Peach-confirmed order data</span></div>
     <div class="stat-row" id="payments-stat-row"></div>
   </div>
@@ -1147,7 +1156,7 @@
     });
   }
 
-  var siteStatus = { site_paused: false, pause_message: '', payments_enabled: true, courier_enabled: true };
+  var siteStatus = { site_paused: false, pause_message: '', payments_enabled: true, courier_enabled: true, test_mode: true };
 
   function switchTab(name) {
     var buttons = document.querySelectorAll('.tab-btn');
@@ -1162,6 +1171,7 @@
       renderSiteStatus();
       renderPaymentsStatus();
       renderCourierStatus();
+      renderTestModeStatus();
     });
   }
 
@@ -1234,20 +1244,40 @@
       .catch(function (e) { window.alert(e.message); });
   }
 
+  function renderTestModeStatus() {
+    var pill = document.getElementById('test-mode-status-pill');
+    pill.textContent = siteStatus.test_mode ? 'On' : 'Off';
+    pill.className = 'pill ' + (siteStatus.test_mode ? 'pill-pending' : 'pill-good');
+    var btn = document.getElementById('test-mode-toggle-btn');
+    btn.textContent = siteStatus.test_mode ? 'Turn Off (go live)' : 'Turn On';
+    btn.className = 'expense-btn' + (siteStatus.test_mode ? '' : ' warn');
+  }
+
+  function toggleTestMode() {
+    var goingOn = !siteStatus.test_mode;
+    if (!goingOn && !window.confirm('New orders from this point on will count as real revenue in Lifetime Gross Sales and the Income Report. Continue?')) return;
+    rpc('admin_set_test_mode', { p_enabled: goingOn })
+      .then(function () { siteStatus.test_mode = goingOn; renderTestModeStatus(); })
+      .catch(function (e) { window.alert(e.message); });
+  }
+
   function renderPaymentsSummary(rows) {
     var wrap = document.getElementById('payments-stat-row');
     var counts = {};
     var totalFees = 0;
     (rows || []).forEach(function (r) {
       counts[r.status] = (counts[r.status] || 0) + 1;
-      totalFees += Number(r.platform_fee || 0);
+      // Fee Income claims to be real revenue — test orders (tagged in the
+      // Type column below) don't count toward it, same exclusion as the
+      // Lifetime Gross Sales tile and the Income Report.
+      if (!r.is_test) totalFees += Number(r.platform_fee || 0);
     });
     var tiles = [
       ['Paid', counts.paid || 0],
       ['Pending Payment', counts.pending_payment || 0],
       ['Failed', counts.failed || 0],
       ['Refunded', counts.refunded || 0],
-      ['Fee Income', formatRand(totalFees)],
+      ['Fee Income (real only)', formatRand(totalFees)],
     ];
     wrap.innerHTML = tiles.map(function (t) {
       return '<div class="stat-tile"><span class="stat-label">' + t[0] + '</span><span class="stat-value num">' + t[1] + '</span></div>';
@@ -1825,6 +1855,7 @@
 
   function exportOrdersCSV() {
     downloadCSV('quickcloset-orders.csv', [
+      ['is_test', 'Type', function (r) { return r.is_test ? 'Test' : 'Real'; }],
       ['buyer_username', 'Buyer'],
       ['seller_username', 'Seller'],
       ['amount', 'Amount (ZAR)'],
@@ -2059,6 +2090,7 @@
     }
     var body = rows.map(function (r) {
       return '<tr>' +
+        '<td>' + (r.is_test ? '<span class="pill pill-pending">Test</span>' : '<span class="pill pill-good">Real</span>') + '</td>' +
         '<td>' + escapeHtml(r.buyer_username) + '</td>' +
         '<td>' + escapeHtml(r.seller_username) + '</td>' +
         '<td class="num">' + formatRand(r.amount) + '</td>' +
@@ -2069,7 +2101,7 @@
         '<td class="num ' + (r.paid_at ? '' : 'muted') + '">' + fmtDate(r.paid_at) + '</td>' +
         '</tr>';
     }).join('');
-    wrap.innerHTML = '<table><thead><tr><th>Buyer</th><th>Seller</th><th>Amount</th><th>Fulfillment</th><th>Status</th><th>Shipment</th><th>Created</th><th>Paid</th></tr></thead><tbody>' +
+    wrap.innerHTML = '<table><thead><tr><th>Type</th><th>Buyer</th><th>Seller</th><th>Amount</th><th>Fulfillment</th><th>Status</th><th>Shipment</th><th>Created</th><th>Paid</th></tr></thead><tbody>' +
       body + '</tbody></table>';
   }
 
