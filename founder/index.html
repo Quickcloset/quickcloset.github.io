@@ -52,7 +52,7 @@
 
   :root {
     --sage: #7C9468; --sage-deep: #5B7248; --sage-tint: #E4EBDC;
-    --sand: #F1E9DC; --surface: #FBF7F0; --surface-alt: #E6DCC8;
+    --sand: #F1E9DC; --on-dark: #F1E9DC; --surface: #FBF7F0; --surface-alt: #E6DCC8;
     --text: #33291F; --text-2: #6F6152; --text-3: #A69885;
     --border: #DDD0BB; --ink: #211A13; --shadow: rgba(51, 41, 31, 0.12);
   }
@@ -110,10 +110,25 @@
   td { color: var(--text-2); }
   tr:last-child td { border-bottom: none; }
 
-  footer { border-top: 1px solid var(--border); padding: 28px 24px; }
-  .foot-row { max-width: 720px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
-  .foot-brand { display: flex; align-items: center; gap: 8px; font-family: 'Fraunces'; font-weight: 700; font-size: 14px; color: var(--text-2); }
-  .foot-note { font-size: 12px; color: var(--text-3); }
+  /* Shared with index.html: nav actions + the dark rounded footer sheet, so every page reads as one site. */
+  .nav-actions { display: flex; align-items: center; gap: 18px; }
+  .nav-blog-link { font-size: 13px; font-weight: 700; color: var(--text-2); text-decoration: none; white-space: nowrap; }
+  .nav-blog-link:hover { color: var(--sage-deep); }
+  .nav-cta { font-size: 13px; font-weight: 700; color: var(--surface); background: var(--sage); padding: 10px 20px; border-radius: 999px; text-decoration: none; white-space: nowrap; }
+
+  /* Keep the footer at the bottom of short pages instead of floating mid-screen. */
+  body { min-height: 100vh; display: flex; flex-direction: column; }
+  main { flex: 1; width: 100%; }
+
+  /* --on-dark is a FIXED light value (never overridden per theme): this footer is permanently dark in both themes. */
+  footer { background: var(--ink); color: color-mix(in srgb, var(--on-dark) 75%, transparent); padding: 44px 24px 30px; position: relative; border-radius: 26px 26px 0 0; margin-top: -30px; box-shadow: 0 -20px 36px -24px var(--shadow); }
+  .foot-row { max-width: 672px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; }
+  .foot-brand { display: flex; align-items: center; gap: 10px; font-family: 'Fraunces'; font-weight: 700; font-size: 16px; color: var(--on-dark); }
+  .foot-links { display: flex; flex-wrap: wrap; gap: 6px 20px; }
+  .foot-links a { font-size: 12.5px; font-weight: 600; color: var(--on-dark); text-decoration: none; opacity: 0.85; }
+  .foot-links a:hover { opacity: 1; text-decoration: underline; }
+  .foot-note { font-size: 12.5px; }
+  footer a { text-decoration: none; }
 </style>
 
 <nav>
@@ -124,7 +139,7 @@
       </span>
       QuickCloset
     </a>
-    <div style="display:flex;align-items:center;gap:18px;"><a class="nav-back" href="/blog/">Blog</a><a class="nav-back" href="/">&larr; Back to QuickCloset</a></div>
+    <div class="nav-actions"><a class="nav-blog-link" href="/blog/">Blog</a><a class="nav-cta" href="/#download">Get Notified</a></div>
   </div>
 </nav>
 
@@ -149,11 +164,14 @@
 <footer>
   <div class="foot-row">
     <div class="foot-brand">
-      <span class="brand-mark" style="width:22px;height:22px;">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:12px;height:12px;"><path d="M9 4L12 2L15 4M9 4L4 7V20H20V7L15 4M9 4V7H15V4" stroke="#FBF7F0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="brand-mark" style="width:24px;height:24px;">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:13px;height:13px;"><path d="M9 4L12 2L15 4M9 4L4 7V20H20V7L15 4M9 4V7H15V4" stroke="#FBF7F0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       QuickCloset
     </div>
+    <div class="foot-links"><a href="/about/">About</a><a href="/founder/">Founder</a><a href="/blog/">Blog</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
+  </div>
+  <div class="foot-row" style="margin-top:14px;">
     <div class="foot-note">&copy; 2026 QuickCloset. Built in South Africa.</div>
   </div>
 </footer>
