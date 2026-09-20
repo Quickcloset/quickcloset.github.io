@@ -630,6 +630,14 @@ footer.sheet { margin-top: -34px; }
   .v2-prob { grid-template-columns: 70px 1fr; gap: 6px 18px; } .v2-prob p { grid-column: 2; }
   .v2-steps { grid-template-columns: 1fr; gap: 34px; }
 }
+/* Phones: the outfit card shows just TWO pieces, top over bottom, each full-width and uncropped —
+   four side-by-side tiles read as slivers on a narrow screen. */
+@media (max-width: 640px) {
+  .c-outfit .art-pieces { grid-template-columns: 1fr; grid-template-rows: none; flex: none; gap: 12px; }
+  .c-outfit .art-pieces .piece:nth-child(2), .c-outfit .art-pieces .piece:nth-child(4) { display: none; }
+  .c-outfit .art-pieces .piece { aspect-ratio: 4 / 3; min-height: 0; background: var(--surface-alt); }
+  .c-outfit .art-pieces .piece img { object-fit: contain; }
+}
 @media (max-width: 520px) {
   .v2-btn { width: 100%; justify-content: center; }
   .v2-chip.sold { display: none; }
