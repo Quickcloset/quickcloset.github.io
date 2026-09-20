@@ -101,7 +101,17 @@
   }
   .login-btn:disabled { opacity: 0.6; cursor: default; }
   .login-error { color: var(--error); font-size: 13px; margin-top: 14px; min-height: 16px; }
-  .login-success { color: var(--sage-deep); font-size: 13px; margin-top: 8px; min-height: 16px; }
+  .login-success { color: var(--text); font-size: 14px; line-height: 1.5; margin-top: 14px; }
+  .login-success:empty { display: none; }
+  .login-success.show { display: block; padding: 14px 16px; border-radius: 12px; background: var(--sage-tint); border: 1px solid var(--sage); font-weight: 600; }
+  .login-success.show::before { content: '\2713  '; color: var(--sage-deep); font-weight: 800; }
+  .login-error:not(:empty) { padding: 12px 14px; border-radius: 12px; background: var(--error-tint); border: 1px solid var(--error); line-height: 1.45; font-weight: 600; }
+  /* Show/hide password: a real button inside the field, themed via variables so it reads in light and dark. */
+  .pw-wrap { position: relative; }
+  .pw-wrap .field-input { padding-right: 74px; }
+  .pw-toggle { position: absolute; right: 8px; top: 7px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font-family: 'Manrope', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .pw-toggle:hover { color: var(--sage-deep); border-color: var(--sage); }
+  .pw-toggle:focus-visible { outline: 2px solid var(--sage); outline-offset: 1px; }
   .link-btn {
     display: block; margin: 14px auto 0; background: none; border: none; padding: 0;
     color: var(--text-2); font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Manrope', sans-serif;
@@ -371,7 +381,7 @@
         <label class="field-label" for="email">Email</label>
         <input class="field-input" id="email" type="email" required autocomplete="email" />
         <label class="field-label" for="password">Password</label>
-        <input class="field-input" id="password" type="password" required autocomplete="current-password" />
+        <div class="pw-wrap"><input class="field-input" id="password" type="password" required autocomplete="current-password" /><button type="button" class="pw-toggle" onclick="togglePw('password', this)" aria-label="Show password" aria-pressed="false">Show</button></div>
         <label class="remember-row"><input type="checkbox" id="remember-me" checked /> Remember me on this device</label>
         <button class="login-btn" id="login-btn" type="submit">Log In</button>
       </form>
@@ -381,7 +391,7 @@
 
     <div id="forgot-panel" style="display:none;">
       <h1>Reset Password</h1>
-      <span class="sub">Enter your email and we'll send you a reset link.</span>
+      <span class="sub">Enter the email you use for QuickCloset and we'll send you a reset link.</span>
       <form onsubmit="return sendResetLink(event)">
         <label class="field-label" for="forgot-email">Email</label>
         <input class="field-input" id="forgot-email" type="email" required autocomplete="email" />
@@ -397,9 +407,9 @@
       <span class="sub">Choose a new password for your admin account.</span>
       <form onsubmit="return setNewPassword(event)">
         <label class="field-label" for="new-password">New Password</label>
-        <input class="field-input" id="new-password" type="password" required autocomplete="new-password" minlength="6" />
+        <div class="pw-wrap"><input class="field-input" id="new-password" type="password" required autocomplete="new-password" minlength="6" /><button type="button" class="pw-toggle" onclick="togglePw('new-password', this)" aria-label="Show password" aria-pressed="false">Show</button></div>
         <label class="field-label" for="confirm-password">Confirm Password</label>
-        <input class="field-input" id="confirm-password" type="password" required autocomplete="new-password" minlength="6" />
+        <div class="pw-wrap"><input class="field-input" id="confirm-password" type="password" required autocomplete="new-password" minlength="6" /><button type="button" class="pw-toggle" onclick="togglePw('confirm-password', this)" aria-label="Show password" aria-pressed="false">Show</button></div>
         <button class="login-btn" id="recovery-btn" type="submit">Set Password &amp; Log In</button>
       </form>
       <p class="login-error" id="recovery-error"></p>
@@ -927,8 +937,15 @@
   ];
 
   var RECOVERY_TOKENS = parseRecoveryHash();
+  var LINK_ERROR = parseLinkError();
 
   (function () {
+    if (LINK_ERROR) {
+      // Arrived from an expired / already-used reset link: say so and offer a fresh one.
+      showPanel('forgot-panel');
+      document.getElementById('forgot-error').textContent = LINK_ERROR;
+      return;
+    }
     if (RECOVERY_TOKENS) {
       showPanel('recovery-panel');
       return;
@@ -956,6 +973,30 @@
     return { access_token: accessTok, refresh_token: refreshTok, expires_in: Number(params.get('expires_in')) || 3600 };
   }
 
+  // Supabase redirects here with #error=access_denied&error_code=otp_expired&... when a reset
+  // link is expired or was already used (email scanners often "use" a link before you click it).
+  function parseLinkError() {
+    var hash = window.location.hash || '';
+    if (hash.indexOf('error_code=') === -1) return null;
+    var params = new URLSearchParams(hash.slice(1));
+    history.replaceState(null, '', window.location.pathname);
+    var code = params.get('error_code');
+    if (code === 'otp_expired') return 'That reset link has expired or was already used. Enter your email below and send a fresh one, then open the newest email.';
+    return params.get('error_description') ? params.get('error_description').replace(/\+/g, ' ') : 'That link did not work. Send a new reset link below.';
+  }
+
+  // Show / hide a password field. Purely local: the value never leaves the input.
+  function togglePw(id, btn) {
+    var input = document.getElementById(id);
+    var show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.textContent = show ? 'Hide' : 'Show';
+    btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+  }
+
+  var resetCooldownTimer = null;
+
   function showPanel(id) {
     ['login-panel', 'forgot-panel', 'recovery-panel'].forEach(function (p) {
       document.getElementById(p).style.display = p === id ? 'block' : 'none';
@@ -966,6 +1007,7 @@
     document.getElementById('forgot-email').value = document.getElementById('email').value;
     document.getElementById('forgot-error').textContent = '';
     document.getElementById('forgot-success').textContent = '';
+    document.getElementById('forgot-success').className = 'login-success';
     showPanel('forgot-panel');
   }
 
@@ -975,12 +1017,13 @@
 
   function sendResetLink(event) {
     event.preventDefault();
-    var email = document.getElementById('forgot-email').value.trim();
+    var email = document.getElementById('forgot-email').value.trim().toLowerCase();
     var btn = document.getElementById('forgot-btn');
     var err = document.getElementById('forgot-error');
     var success = document.getElementById('forgot-success');
     err.textContent = '';
     success.textContent = '';
+    success.className = 'login-success';
     btn.disabled = true;
     btn.textContent = 'Sending…';
 
@@ -991,9 +1034,19 @@
       body: JSON.stringify({ email: email }),
     }).then(function (res) {
       if (!res.ok) return res.json().then(function (b) { throw new Error(b.msg || b.error_description || 'Could not send reset link'); });
-      success.textContent = 'Check your email for a reset link.';
-      btn.textContent = 'Send Reset Link';
-      btn.disabled = false;
+      // Supabase answers 200 even when no account matches (so addresses can't be probed), so this
+      // wording must not promise an email exists — it names the address so a typo is obvious.
+      success.textContent = 'If ' + email + ' has an admin account, a reset link is on its way. It can take a couple of minutes — check your spam/junk folder. Wrong address? Go back to log in and try again.';
+      success.className = 'login-success show';
+      var left = 60;
+      btn.disabled = true;
+      btn.textContent = 'Sent — resend in ' + left + 's';
+      clearInterval(resetCooldownTimer);
+      resetCooldownTimer = setInterval(function () {
+        left -= 1;
+        if (left <= 0) { clearInterval(resetCooldownTimer); btn.disabled = false; btn.textContent = 'Send Reset Link'; }
+        else btn.textContent = 'Sent — resend in ' + left + 's';
+      }, 1000);
     }).catch(function (e) {
       err.textContent = e.message;
       btn.disabled = false;
@@ -1112,7 +1165,7 @@
 
   function login(event) {
     event.preventDefault();
-    var email = document.getElementById('email').value.trim();
+    var email = document.getElementById('email').value.trim().toLowerCase();
     var password = document.getElementById('password').value;
     var remember = document.getElementById('remember-me').checked;
     var btn = document.getElementById('login-btn');
@@ -1127,7 +1180,11 @@
       body: JSON.stringify({ email: email, password: password }),
     }).then(function (res) { return res.json().then(function (body) { return { ok: res.ok, body: body }; }); })
       .then(function (result) {
-        if (!result.ok) throw new Error(result.body.error_description || result.body.msg || 'Login failed');
+        if (!result.ok) {
+          var code = result.body.error_code || '';
+          if (code === 'invalid_credentials') throw new Error('Wrong email or password. Check the email is the one your admin account uses, tap Show to see what you typed, or use Forgot password.');
+          throw new Error(result.body.error_description || result.body.msg || 'Login failed');
+        }
         saveSession(result.body, remember);
         return loadDashboard();
       })
