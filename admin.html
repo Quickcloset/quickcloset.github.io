@@ -842,20 +842,20 @@
     <div class="integration-grid">
       <div class="integration-card">
         <span class="integration-name">Groq</span>
-        <span class="integration-desc">Powers the AI Stylist and Find in Closet features (vision + language model).</span>
-        <span class="integration-env">EXPO_PUBLIC_GROQ_KEY</span>
+        <span class="integration-desc">Powers AI auto-fill on cataloguing, the AI Stylist, the style quiz, and Find in Closet (vision + language model). Proxied server-side since 2026-10-21 (groq-proxy Edge Function) — the real key is no longer client-bundled.</span>
+        <span class="integration-env">GROQ_API_KEY</span>
         <a class="integration-link" href="https://console.groq.com/keys" target="_blank" rel="noopener">Open Console →</a>
       </div>
       <div class="integration-card">
         <span class="integration-name">remove.bg</span>
-        <span class="integration-desc">Removes backgrounds from closet item photos on upload.</span>
-        <span class="integration-env">EXPO_PUBLIC_REMOVE_BG_KEY</span>
+        <span class="integration-desc">Removes backgrounds from closet item/avatar photos on upload. Proxied server-side since 2026-10-21 (remove-bg-proxy Edge Function) — the real key is no longer client-bundled.</span>
+        <span class="integration-env">REMOVE_BG_API_KEY</span>
         <a class="integration-link" href="https://www.remove.bg/api" target="_blank" rel="noopener">Open Account →</a>
       </div>
       <div class="integration-card">
         <span class="integration-name">Hugging Face</span>
         <span class="integration-desc">Fallback background removal, used only once remove.bg's free quota runs out.</span>
-        <span class="integration-env">EXPO_PUBLIC_HUGGINGFACE_KEY</span>
+        <span class="integration-env">HUGGINGFACE_API_KEY</span>
         <a class="integration-link" href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Open Account →</a>
       </div>
       <div class="integration-card">
