@@ -601,7 +601,13 @@
       set to 0% this whole time, not because tracking is broken. Courier revenue is the R10 QuickCloset adds on top
       of PUDO's raw quoted rate on every shipped order, from <code>orders.courier_markup</code> — this one is real
       and non-zero as soon as a real PUDO order ships. Subscription income isn't shown: no recurring
-      billing exists in the app yet, so there's nothing real to report there.
+      billing exists in the app yet, so there's nothing real to report there. Card Processing Cost (added
+      2026-10-28) is the real Peach + Nedbank cost of accepting the card payment, from <code>orders.transaction_fee</code>
+      — the buyer pays this at checkout and it passes straight through to Peach/Nedbank, so it's never counted as
+      QuickCloset's own income or expense here; it's shown purely so the real cost per transaction stays visible.
+      Once Peach actually bills the R99/month service fee or the R250 once-off setup fee, log them below under
+      "Payment Processing Fees" — they're real business expenses, not transaction-level costs, which is why they
+      belong in the Expenses table below rather than this report.
     </p>
     <div class="total-income-banner" id="total-income-banner"></div>
     <div class="table-wrap" id="income-table-wrap"></div>
@@ -1714,6 +1720,7 @@
       ['avg_sale_price', 'Avg Sale Price (ZAR)', function (r) { var c = Number(r.orders_count); return c > 0 ? (Number(r.gross_sales) / c).toFixed(2) : ''; }],
       ['transaction_fee_income', 'Transaction Fee Income (ZAR)'],
       ['courier_revenue_income', 'Courier Revenue Income (ZAR)'],
+      ['transaction_fee_processing_cost', 'Card Processing Cost — pass-through, not income (ZAR)'],
     ], incomeRows);
   }
 
@@ -1994,6 +2001,10 @@
       '<div class="tib-item"><span class="tib-label">Lifetime Gross Sales</span>' +
         '<span class="tib-value tib-muted">' + formatRand(t.total_gross_sales) + '</span>' +
         '<span class="tib-sub">' + t.total_orders + ' paid order' + (t.total_orders !== 1 ? 's' : '') + ' — this is buyer/seller money passing through, not QuickCloset\'s income. This is also the number Nedbank/Peach will care about for the TPPP registration conversation — a one-time alert email fires automatically once this crosses R100,000.</span>' +
+      '</div>' +
+      '<div class="tib-item"><span class="tib-label">Card Processing Cost (All-Time)</span>' +
+        '<span class="tib-value tib-muted">' + formatRand(t.total_transaction_fee_processing_cost || 0) + '</span>' +
+        '<span class="tib-sub">The real Peach + Nedbank card-processing cost, charged to the buyer and paid straight through (<code>orders.transaction_fee</code>) — not QuickCloset\'s income or expense, shown here so a future rate drift (like the one fixed 2026-10-28) is visible, not invisible.</span>' +
       '</div>';
   }
 
@@ -2004,7 +2015,7 @@
       wrap.innerHTML = '<div class="empty-state">No paid orders in this range.</div>';
       return;
     }
-    var totalOrders = 0, totalGross = 0, totalFees = 0, totalCourierRevenue = 0;
+    var totalOrders = 0, totalGross = 0, totalFees = 0, totalCourierRevenue = 0, totalProcessingCost = 0;
     var body = rows.map(function (r) {
       var count = Number(r.orders_count);
       var gross = Number(r.gross_sales);
@@ -2012,6 +2023,7 @@
       totalGross += gross;
       totalFees += Number(r.transaction_fee_income);
       totalCourierRevenue += Number(r.courier_revenue_income);
+      totalProcessingCost += Number(r.transaction_fee_processing_cost || 0);
       var avg = count > 0 ? gross / count : null;
       var d = new Date(r.month + 'T00:00:00Z');
       var label = d.toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
@@ -2022,6 +2034,7 @@
         '<td class="num ' + (avg == null ? 'muted' : '') + '">' + (avg == null ? '—' : formatRand(avg)) + '</td>' +
         '<td class="num">' + formatRand(r.transaction_fee_income) + '</td>' +
         '<td class="num">' + formatRand(r.courier_revenue_income) + '</td>' +
+        '<td class="num muted">' + formatRand(r.transaction_fee_processing_cost || 0) + '</td>' +
         '</tr>';
     }).join('');
     var totalAvg = totalOrders > 0 ? totalGross / totalOrders : null;
@@ -2032,8 +2045,9 @@
       '<td class="num">' + (totalAvg == null ? '—' : formatRand(totalAvg)) + '</td>' +
       '<td class="num">' + formatRand(totalFees) + '</td>' +
       '<td class="num">' + formatRand(totalCourierRevenue) + '</td>' +
+      '<td class="num muted">' + formatRand(totalProcessingCost) + '</td>' +
       '</tr>';
-    wrap.innerHTML = '<table><thead><tr><th>Month</th><th>Orders</th><th>Gross Sales</th><th>Avg Sale Price</th><th>Fee Income</th><th>Courier Revenue</th></tr></thead><tbody>' +
+    wrap.innerHTML = '<table><thead><tr><th>Month</th><th>Orders</th><th>Gross Sales</th><th>Avg Sale Price</th><th>Fee Income</th><th>Courier Revenue</th><th>Processing Cost (pass-through)</th></tr></thead><tbody>' +
       body + foot + '</tbody></table>';
   }
 
