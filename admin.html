@@ -645,9 +645,17 @@
         <label for="expense-amount">Amount (ZAR)</label>
         <input type="number" id="expense-amount" step="0.01" min="0.01" required />
       </div>
+      <div class="expense-field date">
+        <label for="expense-period-start">Period start (optional)</label>
+        <input type="date" id="expense-period-start" />
+      </div>
+      <div class="expense-field date">
+        <label for="expense-period-end">Period end (optional)</label>
+        <input type="date" id="expense-period-end" />
+      </div>
       <div class="expense-field grow">
-        <label for="expense-notes">Notes (optional)</label>
-        <input type="text" id="expense-notes" placeholder="Reference, invoice #, etc." />
+        <label for="expense-notes">Notes / breakdown (optional)</label>
+        <textarea id="expense-notes" placeholder="Reference, invoice #, what this amount is made up of, etc."></textarea>
       </div>
       <div class="expense-actions">
         <button type="submit" class="expense-btn" id="expense-submit-btn">Add Expense</button>
@@ -2061,8 +2069,11 @@
     var total = 0;
     var body = expensesRows.map(function (e) {
       total += Number(e.amount);
+      var periodHtml = (e.period_start || e.period_end)
+        ? '<br><span style="font-weight:500;font-size:12px;color:var(--text-3);">covers ' + fmtDate(e.period_start) + ' – ' + fmtDate(e.period_end) + '</span>'
+        : '';
       return '<tr>' +
-        '<td class="num">' + fmtDate(e.expense_date) + '</td>' +
+        '<td class="num">' + fmtDate(e.expense_date) + periodHtml + '</td>' +
         '<td>' + escapeHtml(e.category) + '</td>' +
         '<td>' + escapeHtml(e.description) + '</td>' +
         '<td class="num">' + formatRand(e.amount) + '</td>' +
@@ -2084,6 +2095,8 @@
       ['category', 'Category'],
       ['description', 'Description'],
       ['amount', 'Amount (ZAR)'],
+      ['period_start', 'Period start', function (r) { return r.period_start ? fmtDate(r.period_start) : ''; }],
+      ['period_end', 'Period end', function (r) { return r.period_end ? fmtDate(r.period_end) : ''; }],
       ['notes', 'Notes'],
     ], expensesRows);
   }
@@ -2096,6 +2109,8 @@
     document.getElementById('expense-category').value = e.category;
     document.getElementById('expense-description').value = e.description;
     document.getElementById('expense-amount').value = e.amount;
+    document.getElementById('expense-period-start').value = e.period_start || '';
+    document.getElementById('expense-period-end').value = e.period_end || '';
     document.getElementById('expense-notes').value = e.notes || '';
     document.getElementById('expense-submit-btn').textContent = 'Save Changes';
     document.getElementById('expense-cancel-btn').style.display = 'inline-block';
@@ -2107,6 +2122,8 @@
     document.getElementById('expense-category').value = '';
     document.getElementById('expense-description').value = '';
     document.getElementById('expense-amount').value = '';
+    document.getElementById('expense-period-start').value = '';
+    document.getElementById('expense-period-end').value = '';
     document.getElementById('expense-notes').value = '';
     document.getElementById('expense-date').value = new Date().toISOString().slice(0, 10);
     document.getElementById('expense-submit-btn').textContent = 'Add Expense';
@@ -2141,15 +2158,21 @@
     var description = document.getElementById('expense-description').value.trim();
     var amount = parseFloat(document.getElementById('expense-amount').value);
     var notes = document.getElementById('expense-notes').value.trim() || null;
+    var periodStart = document.getElementById('expense-period-start').value || null;
+    var periodEnd = document.getElementById('expense-period-end').value || null;
 
     if (!date || !category || !description || !amount || amount <= 0) {
       err.textContent = 'Please fill in date, category, description, and a positive amount.';
       return false;
     }
+    if (periodStart && periodEnd && periodStart > periodEnd) {
+      err.textContent = 'Period start must be before period end.';
+      return false;
+    }
 
     var call = editingExpenseId
-      ? rpc('admin_update_expense', { p_id: editingExpenseId, p_date: date, p_category: category, p_description: description, p_amount: amount, p_notes: notes })
-      : rpc('admin_add_expense', { p_date: date, p_category: category, p_description: description, p_amount: amount, p_notes: notes });
+      ? rpc('admin_update_expense', { p_id: editingExpenseId, p_date: date, p_category: category, p_description: description, p_amount: amount, p_notes: notes, p_period_start: periodStart, p_period_end: periodEnd })
+      : rpc('admin_add_expense', { p_date: date, p_category: category, p_description: description, p_amount: amount, p_notes: notes, p_period_start: periodStart, p_period_end: periodEnd });
 
     call
       .then(function () {
